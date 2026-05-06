@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "GHlXJRU5f2aIyDlt5wr3xaybO2mghXkMsglK3UP2Ffs=",
+  "Source": "SRG.Api",
+  "BasePath": "_content/SRG.Api",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}

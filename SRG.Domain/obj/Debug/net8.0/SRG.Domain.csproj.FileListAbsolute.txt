@@ -1,0 +1,11 @@
+/Users/janrzepisko/ipid/srg/api/SRG.Domain/bin/Debug/net8.0/SRG.Domain.deps.json
+/Users/janrzepisko/ipid/srg/api/SRG.Domain/bin/Debug/net8.0/SRG.Domain.dll
+/Users/janrzepisko/ipid/srg/api/SRG.Domain/bin/Debug/net8.0/SRG.Domain.pdb
+/Users/janrzepisko/ipid/srg/api/SRG.Domain/obj/Debug/net8.0/SRG.Domain.GeneratedMSBuildEditorConfig.editorconfig
+/Users/janrzepisko/ipid/srg/api/SRG.Domain/obj/Debug/net8.0/SRG.Domain.AssemblyInfoInputs.cache
+/Users/janrzepisko/ipid/srg/api/SRG.Domain/obj/Debug/net8.0/SRG.Domain.AssemblyInfo.cs
+/Users/janrzepisko/ipid/srg/api/SRG.Domain/obj/Debug/net8.0/SRG.Domain.csproj.CoreCompileInputs.cache
+/Users/janrzepisko/ipid/srg/api/SRG.Domain/obj/Debug/net8.0/SRG.Domain.dll
+/Users/janrzepisko/ipid/srg/api/SRG.Domain/obj/Debug/net8.0/refint/SRG.Domain.dll
+/Users/janrzepisko/ipid/srg/api/SRG.Domain/obj/Debug/net8.0/SRG.Domain.pdb
+/Users/janrzepisko/ipid/srg/api/SRG.Domain/obj/Debug/net8.0/ref/SRG.Domain.dll

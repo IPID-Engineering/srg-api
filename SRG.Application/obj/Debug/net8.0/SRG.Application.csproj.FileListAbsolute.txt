@@ -1,0 +1,15 @@
+/Users/janrzepisko/ipid/srg/api/SRG.Application/bin/Debug/net8.0/SRG.Application.deps.json
+/Users/janrzepisko/ipid/srg/api/SRG.Application/bin/Debug/net8.0/SRG.Application.dll
+/Users/janrzepisko/ipid/srg/api/SRG.Application/bin/Debug/net8.0/SRG.Application.pdb
+/Users/janrzepisko/ipid/srg/api/SRG.Application/bin/Debug/net8.0/SRG.Domain.dll
+/Users/janrzepisko/ipid/srg/api/SRG.Application/bin/Debug/net8.0/SRG.Domain.pdb
+/Users/janrzepisko/ipid/srg/api/SRG.Application/obj/Debug/net8.0/SRG.Application.csproj.AssemblyReference.cache
+/Users/janrzepisko/ipid/srg/api/SRG.Application/obj/Debug/net8.0/SRG.Application.GeneratedMSBuildEditorConfig.editorconfig
+/Users/janrzepisko/ipid/srg/api/SRG.Application/obj/Debug/net8.0/SRG.Application.AssemblyInfoInputs.cache
+/Users/janrzepisko/ipid/srg/api/SRG.Application/obj/Debug/net8.0/SRG.Application.AssemblyInfo.cs
+/Users/janrzepisko/ipid/srg/api/SRG.Application/obj/Debug/net8.0/SRG.Application.csproj.CoreCompileInputs.cache
+/Users/janrzepisko/ipid/srg/api/SRG.Application/obj/Debug/net8.0/SRG.Appl.9FD28777.Up2Date
+/Users/janrzepisko/ipid/srg/api/SRG.Application/obj/Debug/net8.0/SRG.Application.dll
+/Users/janrzepisko/ipid/srg/api/SRG.Application/obj/Debug/net8.0/refint/SRG.Application.dll
+/Users/janrzepisko/ipid/srg/api/SRG.Application/obj/Debug/net8.0/SRG.Application.pdb
+/Users/janrzepisko/ipid/srg/api/SRG.Application/obj/Debug/net8.0/ref/SRG.Application.dll

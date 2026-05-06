@@ -1,0 +1,19 @@
+# This is a generated file. Not intended for manual editing.
+services:
+  api:
+    build:
+      context: "/Users/janrzepisko/ipid/srg/api"
+      dockerfile: "Dockerfile"
+    command: []
+    entrypoint:
+    - "dotnet"
+    - "/app/bin/Debug/net8.0/SRG.Api.dll"
+    environment:
+      DOTNET_USE_POLLING_FILE_WATCHER: "true"
+    image: "srg.api:dev"
+    ports: []
+    volumes:
+    - "/Users/janrzepisko/ipid/srg/api/SRG.Api:/app:rw"
+    - "/Users/janrzepisko/ipid/srg/api:/src:rw"
+    - "/Users/janrzepisko/.nuget/packages:/root/.nuget/packages"
+    working_dir: "/app"
