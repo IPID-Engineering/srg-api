@@ -14,6 +14,8 @@ public interface IForemanDailyReportService
     Task<ForemanDkpResponse> AddMaterialAsync(Guid reportId, AddForemanMaterialRequest request, Guid crewId, CancellationToken cancellationToken);
     Task<ForemanDkpResponse> UpdateNotesAsync(Guid reportId, string? notes, Guid crewId, CancellationToken cancellationToken);
     Task<ForemanDkpResponse> UpdateWorkOrderAsync(Guid reportId, Guid? workOrderId, Guid crewId, CancellationToken cancellationToken);
+    Task<ForemanDkpResponse> AddWorkOrderAsync(Guid reportId, Guid workOrderId, Guid crewId, CancellationToken cancellationToken);
+    Task<ForemanDkpResponse> RemoveWorkOrderAsync(Guid reportId, Guid workOrderId, Guid crewId, CancellationToken cancellationToken);
     Task<ForemanDkpResponse> SubmitAsync(Guid reportId, Guid crewId, CancellationToken cancellationToken);
 }
 
@@ -104,7 +106,10 @@ public class ForemanDailyReportService(
         if (report.Status != DailyReportStatus.Draft && report.Status != DailyReportStatus.Rejected)
             throw new ValidationException("Nie można edytować karty która nie jest szkicem lub nie wymaga poprawek.");
 
-        var existingEntry = report.WorkEntries.FirstOrDefault(we => we.WorkTypeId == request.WorkTypeId);
+        var existingEntry = request.OrderedWorkId.HasValue
+            ? report.WorkEntries.FirstOrDefault(we => we.OrderedWorkId == request.OrderedWorkId)
+            : report.WorkEntries.FirstOrDefault(we => we.WorkTypeId == request.WorkTypeId && we.OrderedWorkId == null);
+        
         if (existingEntry != null)
         {
             existingEntry.Quantity = request.Quantity;
@@ -117,6 +122,7 @@ public class ForemanDailyReportService(
                 Id = Guid.NewGuid(),
                 DailyReportId = reportId,
                 WorkTypeId = request.WorkTypeId,
+                OrderedWorkId = request.OrderedWorkId,
                 Quantity = request.Quantity,
                 Description = request.Description
             };
@@ -176,6 +182,46 @@ public class ForemanDailyReportService(
             throw new ValidationException("Nie można edytować karty która nie jest szkicem lub nie wymaga poprawek.");
 
         report.WorkOrderId = workOrderId;
+        await dailyReportRepository.SaveChangesAsync(cancellationToken);
+
+        return await GetReportResponseAsync(reportId, cancellationToken);
+    }
+
+    public async Task<ForemanDkpResponse> AddWorkOrderAsync(Guid reportId, Guid workOrderId, Guid crewId, CancellationToken cancellationToken)
+    {
+        var report = await GetReportWithAccessCheckAsync(reportId, crewId, cancellationToken);
+
+        if (report.Status != DailyReportStatus.Draft && report.Status != DailyReportStatus.Rejected)
+            throw new ValidationException("Nie można edytować karty która nie jest szkicem lub nie wymaga poprawek.");
+
+        if (report.DailyReportWorkOrders.Any(drwo => drwo.WorkOrderId == workOrderId))
+            throw new ValidationException("To zlecenie jest już dodane do tej karty.");
+
+        var dailyReportWorkOrder = new DailyReportWorkOrder
+        {
+            Id = Guid.NewGuid(),
+            DailyReportId = reportId,
+            WorkOrderId = workOrderId,
+            AddedAt = DateTime.UtcNow
+        };
+
+        report.DailyReportWorkOrders.Add(dailyReportWorkOrder);
+        await dailyReportRepository.SaveChangesAsync(cancellationToken);
+
+        return await GetReportResponseAsync(reportId, cancellationToken);
+    }
+
+    public async Task<ForemanDkpResponse> RemoveWorkOrderAsync(Guid reportId, Guid workOrderId, Guid crewId, CancellationToken cancellationToken)
+    {
+        var report = await GetReportWithAccessCheckAsync(reportId, crewId, cancellationToken);
+
+        if (report.Status != DailyReportStatus.Draft && report.Status != DailyReportStatus.Rejected)
+            throw new ValidationException("Nie można edytować karty która nie jest szkicem lub nie wymaga poprawek.");
+
+        var dailyReportWorkOrder = report.DailyReportWorkOrders.FirstOrDefault(drwo => drwo.WorkOrderId == workOrderId)
+            ?? throw new KeyNotFoundException("To zlecenie nie jest przypisane do tej karty.");
+
+        report.DailyReportWorkOrders.Remove(dailyReportWorkOrder);
         await dailyReportRepository.SaveChangesAsync(cancellationToken);
 
         return await GetReportResponseAsync(reportId, cancellationToken);
@@ -269,9 +315,14 @@ public class ForemanDailyReportService(
             {
                 Id = we.Id,
                 WorkTypeId = we.WorkTypeId,
+                OrderedWorkId = we.OrderedWorkId,
+                WorkOrderId = we.OrderedWork?.WorkOrderId,
+                WorkOrderNumber = we.OrderedWork?.WorkOrder?.Number,
                 WorkTypeName = we.WorkType?.Name ?? "Nieznany",
+                WorkTypeCode = we.WorkType?.Code,
                 Quantity = we.Quantity,
                 Unit = we.WorkType?.Unit ?? "szt",
+                PlannedQuantity = we.OrderedWork?.PlannedQuantity,
                 Description = we.Description
             }).ToList(),
             MaterialUsages = report.MaterialUsages.Select(mu => new ForemanMaterialUsageItem
@@ -294,7 +345,23 @@ public class ForemanDailyReportService(
                     Content = c.Content,
                     IsResolved = c.IsResolved,
                     CreatedAt = c.CreatedAt
-                }).ToList()
+                }).ToList(),
+            WorkOrders = report.DailyReportWorkOrders.Select(drwo => new ForemanWorkOrderItem
+            {
+                WorkOrderId = drwo.WorkOrderId,
+                WorkOrderNumber = drwo.WorkOrder?.Number ?? "",
+                Description = drwo.WorkOrder?.Description,
+                OrderedWorks = drwo.WorkOrder?.OrderedWorks.Select(ow => new ForemanOrderedWorkItem
+                {
+                    Id = ow.Id,
+                    WorkTypeId = ow.WorkTypeId,
+                    WorkTypeName = ow.WorkType?.Name ?? "Nieznany",
+                    WorkTypeCode = ow.WorkType?.Code,
+                    Unit = ow.Unit,
+                    PlannedQuantity = ow.PlannedQuantity,
+                    Description = ow.Description
+                }).ToList() ?? []
+            }).ToList()
         };
     }
 }
@@ -314,6 +381,26 @@ public class ForemanDkpResponse
     public List<ForemanWorkEntryItem> WorkEntries { get; set; } = [];
     public List<ForemanMaterialUsageItem> MaterialUsages { get; set; } = [];
     public List<ForemanCommentItem> Comments { get; set; } = [];
+    public List<ForemanWorkOrderItem> WorkOrders { get; set; } = [];
+}
+
+public class ForemanWorkOrderItem
+{
+    public Guid WorkOrderId { get; set; }
+    public required string WorkOrderNumber { get; set; }
+    public string? Description { get; set; }
+    public List<ForemanOrderedWorkItem> OrderedWorks { get; set; } = [];
+}
+
+public class ForemanOrderedWorkItem
+{
+    public Guid Id { get; set; }
+    public Guid WorkTypeId { get; set; }
+    public required string WorkTypeName { get; set; }
+    public string? WorkTypeCode { get; set; }
+    public required string Unit { get; set; }
+    public decimal PlannedQuantity { get; set; }
+    public string? Description { get; set; }
 }
 
 public class ForemanCommentItem
@@ -340,9 +427,14 @@ public class ForemanWorkEntryItem
 {
     public Guid Id { get; set; }
     public Guid WorkTypeId { get; set; }
+    public Guid? OrderedWorkId { get; set; }
+    public Guid? WorkOrderId { get; set; }
+    public string? WorkOrderNumber { get; set; }
     public required string WorkTypeName { get; set; }
+    public string? WorkTypeCode { get; set; }
     public decimal Quantity { get; set; }
     public required string Unit { get; set; }
+    public decimal? PlannedQuantity { get; set; }
     public string? Description { get; set; }
 }
 
@@ -365,5 +457,5 @@ public class ForemanDkpCalendarItem
 }
 
 public record AddForemanHoursRequest(Guid WorkerId, decimal Hours);
-public record AddForemanWorkRequest(Guid WorkTypeId, decimal Quantity, string? Description);
+public record AddForemanWorkRequest(Guid WorkTypeId, decimal Quantity, string? Description, Guid? OrderedWorkId);
 public record AddForemanMaterialRequest(Guid MaterialId, decimal Quantity);

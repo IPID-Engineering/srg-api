@@ -8,4 +8,7 @@ public class WarehouseStock
     public Guid MaterialId { get; set; }
     public Material? Material { get; set; }
     public decimal Quantity { get; set; }
+    public decimal ReservedQuantity { get; set; }
+    
+    public decimal AvailableQuantity => Quantity - ReservedQuantity;
 }

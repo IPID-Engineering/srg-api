@@ -172,6 +172,7 @@ public class WarehouseRepository(AppDbContext dbContext) : IWarehouseRepository
     {
         return dbContext.StockMovements
             .Include(movement => movement.Material)
+            .Include(movement => movement.CreatedBy)
             .Where(movement => movement.WarehouseId == warehouseId)
             .OrderByDescending(movement => movement.CreatedAt)
             .ToListAsync(cancellationToken);
@@ -212,6 +213,26 @@ public class WarehouseRepository(AppDbContext dbContext) : IWarehouseRepository
             .Include(issue => issue.Items)
             .ThenInclude(item => item.Material)
             .FirstOrDefaultAsync(issue => issue.Id == id, cancellationToken);
+    }
+
+    public Task<Issue?> GetIssueBySourceIdAsync(Guid sourceId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.Issues
+            .Include(issue => issue.WorkOrder)
+            .Include(issue => issue.ToWarehouse)
+            .FirstOrDefaultAsync(issue => issue.Id == sourceId, cancellationToken);
+    }
+
+    public async Task<int> GetNextIssueNumberAsync(CancellationToken cancellationToken = default)
+    {
+        var lastIssue = await dbContext.Issues
+            .OrderByDescending(i => i.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+        
+        if (lastIssue?.Number is null) return 1;
+        
+        var numberPart = lastIssue.Number.TrimStart('W');
+        return int.TryParse(numberPart, out var num) ? num + 1 : 1;
     }
 
     public async Task AddIssueAsync(Issue issue, CancellationToken cancellationToken = default)

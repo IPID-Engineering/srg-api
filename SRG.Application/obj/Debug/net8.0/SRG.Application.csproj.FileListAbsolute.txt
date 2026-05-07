@@ -13,3 +13,4 @@
 /Users/janrzepisko/ipid/srg/api/SRG.Application/obj/Debug/net8.0/refint/SRG.Application.dll
 /Users/janrzepisko/ipid/srg/api/SRG.Application/obj/Debug/net8.0/SRG.Application.pdb
 /Users/janrzepisko/ipid/srg/api/SRG.Application/obj/Debug/net8.0/ref/SRG.Application.dll
+/Users/janrzepisko/ipid/srg/api/SRG.Application/obj/Debug/net8.0/SRG.Application.sourcelink.json

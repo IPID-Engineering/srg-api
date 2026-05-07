@@ -25,6 +25,7 @@ public class DailyReport
     public Section? Section { get; set; }
     public Guid? WorkOrderId { get; set; }
     public WorkOrder? WorkOrder { get; set; }
+    public ICollection<DailyReportWorkOrder> DailyReportWorkOrders { get; set; } = [];
     public Guid? CreatedById { get; set; }
     public User? CreatedBy { get; set; }
     public DailyReportStatus Status { get; set; } = DailyReportStatus.Draft;

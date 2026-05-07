@@ -5,6 +5,7 @@ namespace SRG.Domain.Entities;
 public class Issue
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+    public required string Number { get; set; }
     public Guid WorkOrderId { get; set; }
     public WorkOrder? WorkOrder { get; set; }
     public Guid FromWarehouseId { get; set; }

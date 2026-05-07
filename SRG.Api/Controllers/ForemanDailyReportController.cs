@@ -173,7 +173,50 @@ public class ForemanDailyReportController(IForemanDailyReportService foremanDail
             return NotFound(new { message = exception.Message });
         }
     }
+
+    [HttpPost("{id:guid}/work-orders")]
+    public async Task<ActionResult<ForemanDkpResponse>> AddWorkOrder(
+        Guid id,
+        [FromBody] AddDkpWorkOrderRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var crewId = User.GetCrewIdRequired();
+            return Ok(await foremanDailyReportService.AddWorkOrderAsync(id, request.WorkOrderId, crewId, cancellationToken));
+        }
+        catch (ValidationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new { message = exception.Message });
+        }
+    }
+
+    [HttpDelete("{id:guid}/work-orders/{workOrderId:guid}")]
+    public async Task<ActionResult<ForemanDkpResponse>> RemoveWorkOrder(
+        Guid id,
+        Guid workOrderId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var crewId = User.GetCrewIdRequired();
+            return Ok(await foremanDailyReportService.RemoveWorkOrderAsync(id, workOrderId, crewId, cancellationToken));
+        }
+        catch (ValidationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new { message = exception.Message });
+        }
+    }
 }
 
 public record UpdateNotesRequest(string? Notes);
 public record UpdateDkpWorkOrderRequest(Guid? WorkOrderId);
+public record AddDkpWorkOrderRequest(Guid WorkOrderId);

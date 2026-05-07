@@ -139,6 +139,7 @@ public class DailyReportRepository(AppDbContext dbContext) : IDailyReportReposit
             .ThenInclude(entry => entry.WorkType)
             .Include(dailyReport => dailyReport.WorkEntries)
             .ThenInclude(entry => entry.OrderedWork)
+            .ThenInclude(ow => ow!.WorkOrder)
             .Include(dailyReport => dailyReport.MaterialUsages)
             .ThenInclude(entry => entry.Material)
             .Include(dailyReport => dailyReport.MaterialUsages)
@@ -154,7 +155,11 @@ public class DailyReportRepository(AppDbContext dbContext) : IDailyReportReposit
             .ThenInclude(comment => comment.Replies)
             .ThenInclude(reply => reply.SubcontractorWorker)
             .Include(dailyReport => dailyReport.StatusHistory)
-            .ThenInclude(history => history.ChangedBy);
+            .ThenInclude(history => history.ChangedBy)
+            .Include(dailyReport => dailyReport.DailyReportWorkOrders)
+            .ThenInclude(drwo => drwo.WorkOrder)
+            .ThenInclude(wo => wo!.OrderedWorks)
+            .ThenInclude(ow => ow.WorkType);
     }
 
     private IQueryable<DailyReport> DailyReportWithWorkersQuery()
@@ -164,8 +169,10 @@ public class DailyReportRepository(AppDbContext dbContext) : IDailyReportReposit
             .Include(r => r.WorkHours).ThenInclude(wh => wh.Worker)
             .Include(r => r.WorkHours).ThenInclude(wh => wh.SubcontractorWorker)
             .Include(r => r.WorkEntries).ThenInclude(we => we.WorkType)
+            .Include(r => r.WorkEntries).ThenInclude(we => we.OrderedWork).ThenInclude(ow => ow!.WorkOrder)
             .Include(r => r.MaterialUsages).ThenInclude(mu => mu.Material)
             .Include(r => r.Comments).ThenInclude(c => c.Author)
-            .Include(r => r.Comments).ThenInclude(c => c.SubcontractorWorker);
+            .Include(r => r.Comments).ThenInclude(c => c.SubcontractorWorker)
+            .Include(r => r.DailyReportWorkOrders).ThenInclude(drwo => drwo.WorkOrder).ThenInclude(wo => wo!.OrderedWorks).ThenInclude(ow => ow.WorkType);
     }
 }

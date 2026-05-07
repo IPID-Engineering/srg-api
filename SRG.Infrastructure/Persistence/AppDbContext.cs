@@ -26,6 +26,7 @@ public class AppDbContext(
     public DbSet<DailyReport> DailyReports => Set<DailyReport>();
     public DbSet<DailyReportComment> DailyReportComments => Set<DailyReportComment>();
     public DbSet<DailyReportStatusHistory> DailyReportStatusHistory => Set<DailyReportStatusHistory>();
+    public DbSet<DailyReportWorkOrder> DailyReportWorkOrders => Set<DailyReportWorkOrder>();
     public DbSet<WorkHour> WorkHours => Set<WorkHour>();
     public DbSet<WorkEntry> DailyReportWorkEntries => Set<WorkEntry>();
     public DbSet<MaterialUsage> MaterialUsages => Set<MaterialUsage>();

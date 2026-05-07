@@ -52,6 +52,8 @@ public record StockResponse(
     string MaterialName, 
     string Unit, 
     decimal Quantity,
+    decimal ReservedQuantity,
+    decimal AvailableQuantity,
     Guid? CategoryId,
     string? CategoryName,
     Guid? ParentCategoryId,
@@ -63,6 +65,7 @@ public record AddIssueItemRequest(Guid MaterialId, decimal Quantity);
 
 public record IssueResponse(
     Guid Id,
+    string Number,
     Guid WorkOrderId,
     string WorkOrderNumber,
     Guid FromWarehouseId,
@@ -141,9 +144,16 @@ public record StockMovementResponse(
     Guid WarehouseId,
     Guid MaterialId,
     string? MaterialName,
+    string? CategoryName,
     decimal Quantity,
+    decimal QuantityBefore,
+    decimal QuantityAfter,
     StockMovementDirection Direction,
     StockMovementSourceType SourceType,
     Guid SourceId,
+    string? SourceNumber,
+    string? WorkOrderNumber,
+    string? TargetWarehouseName,
     Guid CreatedById,
+    string? CreatedByName,
     DateTime CreatedAt);

@@ -27,5 +27,6 @@ public class WorkOrder
     public ICollection<OrderedWork> OrderedWorks { get; set; } = [];
     public ICollection<OrderedMaterial> OrderedMaterials { get; set; } = [];
     public ICollection<DailyReport> DailyReports { get; set; } = [];
+    public ICollection<DailyReportWorkOrder> DailyReportWorkOrders { get; set; } = [];
     public ICollection<Issue> Issues { get; set; } = [];
 }

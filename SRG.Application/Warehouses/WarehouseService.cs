@@ -120,6 +120,8 @@ public class WarehouseService(IWarehouseRepository warehouse, IConstructionRepos
             material?.Name ?? string.Empty,
             material?.Unit ?? string.Empty,
             stock.Quantity,
+            stock.ReservedQuantity,
+            stock.AvailableQuantity,
             category?.Id,
             category?.Name,
             parentCategory?.Id,
@@ -132,7 +134,59 @@ public class WarehouseService(IWarehouseRepository warehouse, IConstructionRepos
             ?? throw new KeyNotFoundException("Warehouse was not found.");
 
         var movements = await warehouse.GetMovementsAsync(warehouseId, cancellationToken);
-        return movements.Select(ToResponse).ToList();
+        var categories = await warehouse.GetCategoriesAsync(cancellationToken);
+        var categoryDict = categories.ToDictionary(c => c.Id);
+        
+        var result = new List<StockMovementResponse>();
+        foreach (var m in movements)
+        {
+            string? sourceNumber = null;
+            string? workOrderNumber = null;
+            string? targetWarehouseName = null;
+            string? categoryName = null;
+            
+            if (m.Material?.CategoryId != null && categoryDict.TryGetValue(m.Material.CategoryId, out var cat))
+            {
+                categoryName = cat.Name;
+            }
+            
+            if (m.SourceType == StockMovementSourceType.Issue)
+            {
+                var issue = await warehouse.GetIssueBySourceIdAsync(m.SourceId, cancellationToken);
+                if (issue != null)
+                {
+                    sourceNumber = issue.Number;
+                    workOrderNumber = issue.WorkOrder?.Number;
+                    targetWarehouseName = issue.ToWarehouse?.Name;
+                }
+            }
+            else if (m.SourceType == StockMovementSourceType.GRV)
+            {
+                var grv = await warehouse.GetGoodsReceivedVoucherByIdAsync(m.SourceId, cancellationToken);
+                sourceNumber = grv?.Number;
+            }
+            
+            result.Add(new StockMovementResponse(
+                m.Id,
+                m.WarehouseId,
+                m.MaterialId,
+                m.Material?.Name,
+                categoryName,
+                m.Quantity,
+                m.QuantityBefore,
+                m.QuantityAfter,
+                m.Direction,
+                m.SourceType,
+                m.SourceId,
+                sourceNumber,
+                workOrderNumber,
+                targetWarehouseName,
+                m.CreatedById,
+                m.CreatedBy?.FirstName != null ? $"{m.CreatedBy.FirstName} {m.CreatedBy.LastName}" : null,
+                m.CreatedAt));
+        }
+        
+        return result;
     }
 
     public static async Task<Warehouse> EnsureSubWarehouseAsync(
@@ -176,24 +230,12 @@ public class WarehouseService(IWarehouseRepository warehouse, IConstructionRepos
             stock.Material?.Name ?? string.Empty,
             stock.Material?.Unit ?? string.Empty,
             stock.Quantity,
+            stock.ReservedQuantity,
+            stock.AvailableQuantity,
             category?.Id,
             category?.Name,
             parentCategory?.Id,
             parentCategory?.Name);
     }
 
-    private static StockMovementResponse ToResponse(StockMovement movement)
-    {
-        return new StockMovementResponse(
-            movement.Id,
-            movement.WarehouseId,
-            movement.MaterialId,
-            movement.Material?.Name,
-            movement.Quantity,
-            movement.Direction,
-            movement.SourceType,
-            movement.SourceId,
-            movement.CreatedById,
-            movement.CreatedAt);
-    }
 }

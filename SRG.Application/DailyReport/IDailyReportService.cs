@@ -17,6 +17,8 @@ public interface IDailyReportService
     Task<DailyReportResponse> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<DailyReportResponse> UpdateNotesAsync(Guid id, UpdateDailyReportNotesRequest request, CancellationToken cancellationToken = default);
     Task<DailyReportResponse> UpdateWorkOrderAsync(Guid id, UpdateDailyReportWorkOrderRequest request, CancellationToken cancellationToken = default);
+    Task<DailyReportResponse> AddWorkOrderAsync(Guid id, AddDailyReportWorkOrderRequest request, CancellationToken cancellationToken = default);
+    Task<DailyReportResponse> RemoveWorkOrderAsync(Guid id, Guid workOrderId, CancellationToken cancellationToken = default);
     Task<DailyReportResponse> AddWorkHoursAsync(Guid id, AddWorkHourRequest request, CancellationToken cancellationToken = default);
     Task<DailyReportResponse> AddWorkAsync(Guid id, AddWorkEntryRequest request, CancellationToken cancellationToken = default);
     Task<DailyReportResponse> AddMaterialAsync(

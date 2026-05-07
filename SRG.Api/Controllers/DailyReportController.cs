@@ -122,6 +122,26 @@ public class DailyReportController(IDailyReportService dailyReportService) : Con
         return await DraftAction(() => dailyReportService.UpdateWorkOrderAsync(id, request, cancellationToken));
     }
 
+    [HttpPost("{id:guid}/work-orders")]
+    [Authorize(Roles = "Foreman,SubcontractorForeman")]
+    public async Task<ActionResult<DailyReportResponse>> AddWorkOrder(
+        Guid id,
+        AddDailyReportWorkOrderRequest request,
+        CancellationToken cancellationToken)
+    {
+        return await DraftAction(() => dailyReportService.AddWorkOrderAsync(id, request, cancellationToken));
+    }
+
+    [HttpDelete("{id:guid}/work-orders/{workOrderId:guid}")]
+    [Authorize(Roles = "Foreman,SubcontractorForeman")]
+    public async Task<ActionResult<DailyReportResponse>> RemoveWorkOrder(
+        Guid id,
+        Guid workOrderId,
+        CancellationToken cancellationToken)
+    {
+        return await DraftAction(() => dailyReportService.RemoveWorkOrderAsync(id, workOrderId, cancellationToken));
+    }
+
     [HttpPost("{id:guid}/hours")]
     [Authorize(Roles = "Foreman,SubcontractorForeman")]
     public async Task<ActionResult<DailyReportResponse>> AddWorkHours(

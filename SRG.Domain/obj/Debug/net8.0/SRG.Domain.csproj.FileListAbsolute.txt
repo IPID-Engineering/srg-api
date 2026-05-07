@@ -9,3 +9,4 @@
 /Users/janrzepisko/ipid/srg/api/SRG.Domain/obj/Debug/net8.0/refint/SRG.Domain.dll
 /Users/janrzepisko/ipid/srg/api/SRG.Domain/obj/Debug/net8.0/SRG.Domain.pdb
 /Users/janrzepisko/ipid/srg/api/SRG.Domain/obj/Debug/net8.0/ref/SRG.Domain.dll
+/Users/janrzepisko/ipid/srg/api/SRG.Domain/obj/Debug/net8.0/SRG.Domain.sourcelink.json

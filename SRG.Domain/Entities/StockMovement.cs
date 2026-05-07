@@ -10,6 +10,8 @@ public class StockMovement
     public Guid MaterialId { get; set; }
     public Material? Material { get; set; }
     public decimal Quantity { get; set; }
+    public decimal QuantityBefore { get; set; }
+    public decimal QuantityAfter { get; set; }
     public StockMovementDirection Direction { get; set; }
     public StockMovementSourceType SourceType { get; set; }
     public Guid SourceId { get; set; }

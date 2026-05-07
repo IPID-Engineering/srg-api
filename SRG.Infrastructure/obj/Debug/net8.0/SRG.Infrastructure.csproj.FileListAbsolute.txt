@@ -36,3 +36,4 @@
 /Users/janrzepisko/ipid/srg/api/SRG.Infrastructure/bin/Debug/net8.0/LatoFont/Lato-Thin.ttf
 /Users/janrzepisko/ipid/srg/api/SRG.Infrastructure/bin/Debug/net8.0/LatoFont/Lato-ThinItalic.ttf
 /Users/janrzepisko/ipid/srg/api/SRG.Infrastructure/bin/Debug/net8.0/LatoFont/OFL.txt
+/Users/janrzepisko/ipid/srg/api/SRG.Infrastructure/obj/Debug/net8.0/SRG.Infrastructure.sourcelink.json

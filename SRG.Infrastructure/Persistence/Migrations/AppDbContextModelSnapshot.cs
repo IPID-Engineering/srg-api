@@ -334,6 +334,31 @@ namespace SRG.Infrastructure.Persistence.Migrations
                     b.ToTable("daily_report_status_history", (string)null);
                 });
 
+            modelBuilder.Entity("SRG.Domain.Entities.DailyReportWorkOrder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("AddedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("DailyReportId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("WorkOrderId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("WorkOrderId");
+
+                    b.HasIndex("DailyReportId", "WorkOrderId")
+                        .IsUnique();
+
+                    b.ToTable("DailyReportWorkOrders", (string)null);
+                });
+
             modelBuilder.Entity("SRG.Domain.Entities.GoodsReceivedVoucher", b =>
                 {
                     b.Property<Guid>("Id")
@@ -473,6 +498,10 @@ namespace SRG.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("FromWarehouseId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -861,6 +890,12 @@ namespace SRG.Infrastructure.Persistence.Migrations
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
 
+                    b.Property<decimal>("QuantityAfter")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("QuantityBefore")
+                        .HasColumnType("numeric");
+
                     b.Property<Guid>("SourceId")
                         .HasColumnType("uuid");
 
@@ -1140,6 +1175,9 @@ namespace SRG.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("Quantity")
                         .HasPrecision(12, 2)
                         .HasColumnType("numeric(12,2)");
+
+                    b.Property<decimal>("ReservedQuantity")
+                        .HasColumnType("numeric");
 
                     b.Property<Guid>("WarehouseId")
                         .HasColumnType("uuid");
@@ -1518,6 +1556,25 @@ namespace SRG.Infrastructure.Persistence.Migrations
                     b.Navigation("ChangedBy");
 
                     b.Navigation("DailyReport");
+                });
+
+            modelBuilder.Entity("SRG.Domain.Entities.DailyReportWorkOrder", b =>
+                {
+                    b.HasOne("SRG.Domain.Entities.DailyReport", "DailyReport")
+                        .WithMany("DailyReportWorkOrders")
+                        .HasForeignKey("DailyReportId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SRG.Domain.Entities.WorkOrder", "WorkOrder")
+                        .WithMany("DailyReportWorkOrders")
+                        .HasForeignKey("WorkOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("DailyReport");
+
+                    b.Navigation("WorkOrder");
                 });
 
             modelBuilder.Entity("SRG.Domain.Entities.GoodsReceivedVoucher", b =>
@@ -2102,6 +2159,8 @@ namespace SRG.Infrastructure.Persistence.Migrations
                 {
                     b.Navigation("Comments");
 
+                    b.Navigation("DailyReportWorkOrders");
+
                     b.Navigation("MaterialUsages");
 
                     b.Navigation("StatusHistory");
@@ -2194,6 +2253,8 @@ namespace SRG.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("SRG.Domain.Entities.WorkOrder", b =>
                 {
+                    b.Navigation("DailyReportWorkOrders");
+
                     b.Navigation("DailyReports");
 
                     b.Navigation("Issues");

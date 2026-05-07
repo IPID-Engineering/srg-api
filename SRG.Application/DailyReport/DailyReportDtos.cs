@@ -26,7 +26,23 @@ public record DailyReportResponse(
     List<WorkEntryResponse> WorkEntries,
     List<MaterialUsageResponse> MaterialUsages,
     List<DailyReportCommentResponse> Comments,
-    List<DailyReportStatusHistoryResponse> StatusHistory);
+    List<DailyReportStatusHistoryResponse> StatusHistory,
+    List<DailyReportWorkOrderResponse> WorkOrders);
+
+public record DailyReportWorkOrderResponse(
+    Guid WorkOrderId,
+    string WorkOrderNumber,
+    string? Description,
+    List<OrderedWorkSummary> OrderedWorks);
+
+public record OrderedWorkSummary(
+    Guid Id,
+    Guid WorkTypeId,
+    string? WorkTypeName,
+    string? WorkTypeCode,
+    string Unit,
+    decimal PlannedQuantity,
+    string? Description);
 
 public record DailyReportCalendarResponse(
     Guid Id,
@@ -44,7 +60,19 @@ public record WorkHourResponse(Guid Id, Guid DailyReportId, Guid? WorkerId, Guid
 
 public record AddWorkEntryRequest(Guid WorkTypeId, Guid? OrderedWorkId, string? Description, decimal Quantity);
 
-public record WorkEntryResponse(Guid Id, Guid DailyReportId, Guid WorkTypeId, Guid? OrderedWorkId, string? WorkTypeName, string? Unit, string? Description, decimal Quantity);
+public record WorkEntryResponse(
+    Guid Id,
+    Guid DailyReportId,
+    Guid WorkTypeId,
+    Guid? OrderedWorkId,
+    Guid? WorkOrderId,
+    string? WorkOrderNumber,
+    string? WorkTypeName,
+    string? WorkTypeCode,
+    string? Unit,
+    string? Description,
+    decimal Quantity,
+    decimal? PlannedQuantity);
 
 public record AddMaterialUsageRequest(Guid MaterialId, Guid? OrderedMaterialId, decimal Quantity);
 
@@ -53,6 +81,10 @@ public record MaterialUsageResponse(Guid Id, Guid DailyReportId, Guid MaterialId
 public record UpdateDailyReportNotesRequest(string? Notes);
 
 public record UpdateDailyReportWorkOrderRequest(Guid? WorkOrderId);
+
+public record AddDailyReportWorkOrderRequest(Guid WorkOrderId);
+
+public record RemoveDailyReportWorkOrderRequest(Guid WorkOrderId);
 
 public record RejectDailyReportRequest(string Reason);
 

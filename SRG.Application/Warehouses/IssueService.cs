@@ -54,8 +54,10 @@ public class IssueService(
             await warehouse.SaveChangesAsync(cancellationToken);
         }
 
+        var nextNumber = await warehouse.GetNextIssueNumberAsync(cancellationToken);
         var issue = new Issue
         {
+            Number = $"W{nextNumber:D4}",
             WorkOrderId = workOrder.Id,
             FromWarehouseId = main.Id,
             ToWarehouseId = destination.Id,
@@ -160,6 +162,7 @@ public class IssueService(
     {
         return new IssueResponse(
             issue.Id,
+            issue.Number,
             issue.WorkOrderId,
             issue.WorkOrder?.Number ?? string.Empty,
             issue.FromWarehouseId,

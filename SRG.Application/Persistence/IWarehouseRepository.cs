@@ -35,6 +35,8 @@ public interface IWarehouseRepository
     Task<List<Issue>> GetIssuesAsync(CancellationToken cancellationToken = default);
     Task<List<Issue>> GetIssuesByWorkOrderAsync(Guid workOrderId, CancellationToken cancellationToken = default);
     Task<Issue?> GetIssueByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task<Issue?> GetIssueBySourceIdAsync(Guid sourceId, CancellationToken cancellationToken = default);
+    Task<int> GetNextIssueNumberAsync(CancellationToken cancellationToken = default);
     Task AddIssueAsync(Issue issue, CancellationToken cancellationToken = default);
     Task AddIssueItemAsync(IssueItem item, CancellationToken cancellationToken = default);
 

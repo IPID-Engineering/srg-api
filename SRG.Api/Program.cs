@@ -67,6 +67,7 @@ if (app.Environment.IsDevelopment())
 }
 
 await app.SeedAdminUserAsync();
+await app.SeedWorkTypesAsync();
 
 app.UseCors("Web");
 

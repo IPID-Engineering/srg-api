@@ -116,6 +116,48 @@ public class DailyReportService(
         return ToResponse(await GetReportAsync(id, cancellationToken));
     }
 
+    public async Task<DailyReportResponse> AddWorkOrderAsync(
+        Guid id,
+        AddDailyReportWorkOrderRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var report = await GetEditableReportAsync(id, cancellationToken);
+        
+        var workOrder = await workOrderRepository.GetWorkOrderByIdAsync(request.WorkOrderId, cancellationToken)
+            ?? throw new KeyNotFoundException("WorkOrder was not found.");
+
+        if (report.DailyReportWorkOrders.Any(drwo => drwo.WorkOrderId == request.WorkOrderId))
+        {
+            throw new ValidationException("WorkOrder is already added to this DailyReport.");
+        }
+
+        var dailyReportWorkOrder = new Domain.Entities.DailyReportWorkOrder
+        {
+            DailyReportId = report.Id,
+            WorkOrderId = request.WorkOrderId,
+            AddedAt = DateTime.UtcNow,
+        };
+
+        report.DailyReportWorkOrders.Add(dailyReportWorkOrder);
+        await dailyReportRepository.SaveChangesAsync(cancellationToken);
+        return ToResponse(await GetReportAsync(id, cancellationToken));
+    }
+
+    public async Task<DailyReportResponse> RemoveWorkOrderAsync(
+        Guid id,
+        Guid workOrderId,
+        CancellationToken cancellationToken = default)
+    {
+        var report = await GetEditableReportAsync(id, cancellationToken);
+        
+        var dailyReportWorkOrder = report.DailyReportWorkOrders.FirstOrDefault(drwo => drwo.WorkOrderId == workOrderId)
+            ?? throw new KeyNotFoundException("WorkOrder is not associated with this DailyReport.");
+
+        report.DailyReportWorkOrders.Remove(dailyReportWorkOrder);
+        await dailyReportRepository.SaveChangesAsync(cancellationToken);
+        return ToResponse(await GetReportAsync(id, cancellationToken));
+    }
+
     public async Task<DailyReportResponse> AddWorkHoursAsync(
         Guid id,
         AddWorkHourRequest request,
@@ -193,14 +235,12 @@ public class DailyReportService(
                 foremanId,
                 cancellationToken);
 
-            await StockService.DecreaseStockAsync(
+            // Reserve materials instead of consuming them immediately
+            await StockService.ReserveMaterialAsync(
                 warehouseRepository,
                 subWarehouse.Id,
                 request.MaterialId,
                 request.Quantity,
-                StockMovementSourceType.DailyReportUsage,
-                report.Id,
-                foremanId,
                 cancellationToken);
 
             await dailyReportRepository.AddMaterialAsync(new MaterialUsage
@@ -348,27 +388,20 @@ public class DailyReportService(
         if (crewIds.Count == 0)
             return [];
 
-        // Get reports with SubcontractorReview status
+        // Get reports in all statuses for this Subcontractor's crews
+        var submitted = await dailyReportRepository.GetByStatusAsync(DailyReportStatus.Submitted, cancellationToken);
+        var pmReview = await dailyReportRepository.GetByStatusAsync(DailyReportStatus.PmReview, cancellationToken);
+        var spmReview = await dailyReportRepository.GetByStatusAsync(DailyReportStatus.SpmReview, cancellationToken);
         var subcontractorReview = await dailyReportRepository.GetByStatusAsync(DailyReportStatus.SubcontractorReview, cancellationToken);
         var subcontractorApproved = await dailyReportRepository.GetByStatusAsync(DailyReportStatus.SubcontractorApproved, cancellationToken);
-        
-        // Also include SpmReview reports that belong to SubcontractorCrews (legacy data from before the status split)
-        var spmReview = await dailyReportRepository.GetByStatusAsync(DailyReportStatus.SpmReview, cancellationToken);
-        var spmReviewForSubcontractor = spmReview.Where(r => r.SubcontractorCrewId.HasValue && crewIds.Contains(r.SubcontractorCrewId.Value)).ToList();
-        
-        // Include rejected reports that were rejected from SubcontractorReview or SpmReview (for this Subcontractor's crews)
         var rejected = await dailyReportRepository.GetByStatusAsync(DailyReportStatus.Rejected, cancellationToken);
-        var rejectedFromSubcontractor = rejected.Where(r => 
-            r.SubcontractorCrewId.HasValue && crewIds.Contains(r.SubcontractorCrewId.Value) &&
-            r.StatusHistory.Any(h => h.ToStatus == DailyReportStatus.Rejected && 
-                (h.FromStatus == DailyReportStatus.SubcontractorReview || h.FromStatus == DailyReportStatus.SpmReview)) &&
-            r.StatusHistory.OrderByDescending(h => h.ChangedAt).First().ToStatus == DailyReportStatus.Rejected
-        ).ToList();
         
-        var allReports = subcontractorReview
-            .Concat(spmReviewForSubcontractor)
-            .Concat(rejectedFromSubcontractor)
+        var allReports = submitted
+            .Concat(pmReview)
+            .Concat(spmReview)
+            .Concat(subcontractorReview)
             .Concat(subcontractorApproved)
+            .Concat(rejected)
             .ToList();
         
         // Filter to only this Subcontractor's crews
@@ -595,6 +628,30 @@ public class DailyReportService(
 
         var previousStatus = report.Status;
         report.Status = DailyReportStatus.SubcontractorApproved;
+        
+        // Consume reserved materials from the foreman's warehouse
+        if (report.MaterialUsages.Count > 0 && report.SubcontractorCrew?.CurrentForemanId != null)
+        {
+            var foremanId = report.SubcontractorCrew.CurrentForemanId.Value;
+            var subWarehouse = await warehouseRepository.GetSubWarehouseByOwnerAsync(foremanId, cancellationToken);
+            
+            if (subWarehouse != null)
+            {
+                foreach (var usage in report.MaterialUsages)
+                {
+                    await StockService.ConsumeReservedMaterialAsync(
+                        warehouseRepository,
+                        subWarehouse.Id,
+                        usage.MaterialId,
+                        usage.Quantity,
+                        StockMovementSourceType.DailyReportUsage,
+                        report.Id,
+                        currentUserContext.UserId ?? Guid.Empty,
+                        cancellationToken);
+                }
+            }
+        }
+        
         await RecordStatusChangeAsync(report.Id, previousStatus, report.Status, null, cancellationToken);
         await dailyReportRepository.SaveChangesAsync(cancellationToken);
         await auditService.LogActionAsync(currentUserContext.UserId ?? Guid.Empty, "SUBCONTRACTOR_APPROVE_DAILY_REPORT", "DailyReport", report.Id, new
@@ -668,10 +725,14 @@ public class DailyReportService(
                 entry.DailyReportId,
                 entry.WorkTypeId,
                 entry.OrderedWorkId,
+                entry.OrderedWork?.WorkOrderId,
+                entry.OrderedWork?.WorkOrder?.Number,
                 entry.WorkType?.Name,
+                entry.WorkType?.Code,
                 entry.WorkType?.Unit,
                 entry.Description,
-                entry.Quantity)).ToList(),
+                entry.Quantity,
+                entry.OrderedWork?.PlannedQuantity)).ToList(),
             report.MaterialUsages.Select(entry => new MaterialUsageResponse(
                 entry.Id,
                 entry.DailyReportId,
@@ -688,7 +749,19 @@ public class DailyReportService(
                 h.Reason,
                 h.ChangedById,
                 h.ChangedBy?.Email,
-                h.ChangedAt)).ToList());
+                h.ChangedAt)).ToList(),
+            report.DailyReportWorkOrders.Select(drwo => new DailyReportWorkOrderResponse(
+                drwo.WorkOrderId,
+                drwo.WorkOrder?.Number ?? "",
+                drwo.WorkOrder?.Description,
+                drwo.WorkOrder?.OrderedWorks.Select(ow => new OrderedWorkSummary(
+                    ow.Id,
+                    ow.WorkTypeId,
+                    ow.WorkType?.Name,
+                    ow.WorkType?.Code,
+                    ow.Unit,
+                    ow.PlannedQuantity,
+                    ow.Description)).ToList() ?? [])).ToList());
     }
 
     private DailyReportCommentResponse ToCommentResponse(DailyReportComment comment)

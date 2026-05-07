@@ -179,3 +179,4 @@
 /Users/janrzepisko/ipid/srg/api/SRG.Api/bin/Debug/net8.0/Microsoft.Extensions.FileProviders.Abstractions.dll
 /Users/janrzepisko/ipid/srg/api/SRG.Api/bin/Debug/net8.0/Microsoft.Extensions.Hosting.Abstractions.dll
 /Users/janrzepisko/ipid/srg/api/SRG.Api/bin/Debug/net8.0/System.Diagnostics.DiagnosticSource.dll
+/Users/janrzepisko/ipid/srg/api/SRG.Api/obj/Debug/net8.0/SRG.Api.sourcelink.json
