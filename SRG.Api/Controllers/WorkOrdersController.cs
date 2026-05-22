@@ -16,7 +16,8 @@ public class WorkOrdersController(IWorkOrderService workOrderService) : Controll
     public async Task<ActionResult<List<WorkOrderResponse>>> Get(CancellationToken cancellationToken)
     {
         var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? string.Empty;
-        return Ok(await workOrderService.GetWorkOrdersAsync(User.GetUserId(), role, cancellationToken));
+        var crewId = User.GetCrewId();
+        return Ok(await workOrderService.GetWorkOrdersAsync(User.GetUserId(), role, crewId, cancellationToken));
     }
 
     [HttpGet("{id:guid}")]
@@ -64,7 +65,8 @@ public class WorkOrdersController(IWorkOrderService workOrderService) : Controll
         AddOrderedMaterialRequest request,
         CancellationToken cancellationToken)
     {
-        return await WriteAction(() => workOrderService.AddOrderedMaterialAsync(id, request, User.GetUserId(), cancellationToken));
+        var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value ?? string.Empty;
+        return await WriteAction(() => workOrderService.AddOrderedMaterialAsync(id, request, User.GetUserId(), role, cancellationToken));
     }
 
     [HttpDelete("{id:guid}/ordered-works/{orderedWorkId:guid}")]

@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using SRG.Api.Extensions;
+using SRG.Api.Middleware;
 using SRG.Api.Services;
 using SRG.Application;
 using SRG.Application.Common;
@@ -70,6 +71,7 @@ await app.SeedAdminUserAsync();
 await app.SeedWorkTypesAsync();
 
 app.UseCors("Web");
+app.UseGlobalExceptionHandler();
 
 app.UseAuthentication();
 app.UseAuthorization();

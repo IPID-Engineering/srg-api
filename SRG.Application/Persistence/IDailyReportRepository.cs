@@ -1,3 +1,4 @@
+using SRG.Application.DailyReports;
 using SRG.Domain.Entities;
 using SRG.Domain.Enums;
 
@@ -12,6 +13,14 @@ public interface IDailyReportRepository
     Task<List<Domain.Entities.DailyReport>> GetByCrewDateRangeAsync(Guid crewId, DateOnly startDate, DateOnly endDate, CancellationToken cancellationToken = default);
     Task<List<Domain.Entities.DailyReport>> GetByCrewForStatsAsync(Guid crewId, DateOnly startDate, DateOnly endDate, CancellationToken cancellationToken = default);
     Task<List<Domain.Entities.DailyReport>> GetByStatusAsync(DailyReportStatus status, CancellationToken cancellationToken = default);
+    Task<List<Domain.Entities.DailyReport>> GetByStatusesAsync(IEnumerable<DailyReportStatus> statuses, CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Returns lightweight list items with aggregated data using SQL projection.
+    /// Much faster than GetByStatusesAsync for list views.
+    /// </summary>
+    Task<List<DailyReportListItemResponse>> GetListItemsByStatusesAsync(IEnumerable<DailyReportStatus> statuses, CancellationToken cancellationToken = default);
+    
     Task<bool> ExistsForCrewDateAsync(Guid crewId, DateOnly date, CancellationToken cancellationToken = default);
     Task<Domain.Entities.DailyReport?> GetBySubcontractorCrewAndDateAsync(Guid subcontractorCrewId, DateOnly date, CancellationToken cancellationToken = default);
     Task AddAsync(Domain.Entities.DailyReport dailyReport, CancellationToken cancellationToken = default);
@@ -20,5 +29,8 @@ public interface IDailyReportRepository
     Task AddMaterialAsync(MaterialUsage entry, CancellationToken cancellationToken = default);
     Task AddCommentAsync(DailyReportComment comment, CancellationToken cancellationToken = default);
     Task AddStatusHistoryAsync(DailyReportStatusHistory history, CancellationToken cancellationToken = default);
+    Task AddChangeHistoryAsync(DailyReportChangeHistory history, CancellationToken cancellationToken = default);
+    Task AddDailyReportWorkOrderAsync(DailyReportWorkOrder entry, CancellationToken cancellationToken = default);
+    Task RemoveDailyReportWorkOrderAsync(DailyReportWorkOrder entry, CancellationToken cancellationToken = default);
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

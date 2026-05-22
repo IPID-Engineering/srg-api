@@ -9,7 +9,7 @@ public interface IMaterialRequestService
     Task<List<MaterialRequestResponse>> GetByWorkOrderAsync(Guid workOrderId, CancellationToken cancellationToken = default);
     Task<List<MaterialRequestResponse>> GetPendingRequestsAsync(CancellationToken cancellationToken = default);
     Task<MaterialRequestResponse> ProcessRequestAsync(Guid requestId, Guid processedById, ProcessMaterialRequestRequest request, CancellationToken cancellationToken = default);
-    Task DeleteRequestAsync(Guid requestId, CancellationToken cancellationToken = default);
+    Task DeleteRequestAsync(Guid requestId, Guid userId, CancellationToken cancellationToken = default);
 }
 
 public class MaterialRequestService(IWarehouseRepository warehouse) : IMaterialRequestService
@@ -74,10 +74,20 @@ public class MaterialRequestService(IWarehouseRepository warehouse) : IMaterialR
         return MaterialRequestMapper.ToResponse(materialRequest);
     }
 
-    public async Task DeleteRequestAsync(Guid requestId, CancellationToken cancellationToken = default)
+    public async Task DeleteRequestAsync(Guid requestId, Guid userId, CancellationToken cancellationToken = default)
     {
         var request = await warehouse.GetMaterialRequestByIdAsync(requestId, cancellationToken)
-            ?? throw new KeyNotFoundException("Request not found");
+            ?? throw new KeyNotFoundException("Wniosek nie został znaleziony.");
+
+        if (request.CreatedById != userId)
+        {
+            throw new System.ComponentModel.DataAnnotations.ValidationException("Możesz usuwać tylko swoje wnioski.");
+        }
+        
+        if (request.Status != MaterialRequestStatus.Pending)
+        {
+            throw new System.ComponentModel.DataAnnotations.ValidationException("Można usuwać tylko wnioski oczekujące na rozpatrzenie.");
+        }
 
         warehouse.RemoveMaterialRequest(request);
         await warehouse.SaveChangesAsync(cancellationToken);

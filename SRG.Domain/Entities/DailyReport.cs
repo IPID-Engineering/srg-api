@@ -37,4 +37,5 @@ public class DailyReport
     public ICollection<MaterialUsage> MaterialUsages { get; set; } = [];
     public ICollection<DailyReportComment> Comments { get; set; } = [];
     public ICollection<DailyReportStatusHistory> StatusHistory { get; set; } = [];
+    public ICollection<DailyReportChangeHistory> ChangeHistory { get; set; } = [];
 }

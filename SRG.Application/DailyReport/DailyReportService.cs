@@ -331,17 +331,24 @@ public class DailyReportService(
 
     public async Task<List<DailyReportResponse>> GetForPmReviewAsync(CancellationToken cancellationToken = default)
     {
-        var submitted = await dailyReportRepository.GetByStatusAsync(DailyReportStatus.Submitted, cancellationToken);
-        var pmReview = await dailyReportRepository.GetByStatusAsync(DailyReportStatus.PmReview, cancellationToken);
-        var spmReview = await dailyReportRepository.GetByStatusAsync(DailyReportStatus.SpmReview, cancellationToken);
-        var spmApproved = await dailyReportRepository.GetByStatusAsync(DailyReportStatus.SpmApproved, cancellationToken);
-        var subcontractorReview = await dailyReportRepository.GetByStatusAsync(DailyReportStatus.SubcontractorReview, cancellationToken);
-        var subcontractorApproved = await dailyReportRepository.GetByStatusAsync(DailyReportStatus.SubcontractorApproved, cancellationToken);
-        
-        // Only include rejected reports that were rejected from PM review (not SPM/Subcontractor review)
-        var rejected = await dailyReportRepository.GetByStatusAsync(DailyReportStatus.Rejected, cancellationToken);
-        var rejectedFromPm = rejected.Where(r => 
+        var statuses = new[]
         {
+            DailyReportStatus.Submitted,
+            DailyReportStatus.PmReview,
+            DailyReportStatus.SpmReview,
+            DailyReportStatus.SpmApproved,
+            DailyReportStatus.SubcontractorReview,
+            DailyReportStatus.SubcontractorApproved,
+            DailyReportStatus.Rejected
+        };
+        
+        var allReports = await dailyReportRepository.GetByStatusesAsync(statuses, cancellationToken);
+        
+        // Filter out rejected reports that were NOT rejected from PM review
+        var result = allReports.Where(r =>
+        {
+            if (r.Status != DailyReportStatus.Rejected) return true;
+            
             var lastRejection = r.StatusHistory
                 .Where(h => h.ToStatus == DailyReportStatus.Rejected)
                 .OrderByDescending(h => h.ChangedAt)
@@ -350,30 +357,24 @@ public class DailyReportService(
                    lastRejection?.FromStatus != DailyReportStatus.SubcontractorReview;
         }).ToList();
         
-        return submitted
-            .Concat(pmReview)
-            .Concat(rejectedFromPm)
-            .Concat(spmReview)
-            .Concat(spmApproved)
-            .Concat(subcontractorReview)
-            .Concat(subcontractorApproved)
-            .Select(ToResponse)
-            .ToList();
+        return result.Select(ToResponse).ToList();
     }
 
     public async Task<List<DailyReportResponse>> GetForSpmReviewAsync(CancellationToken cancellationToken = default)
     {
-        var spmReview = await dailyReportRepository.GetByStatusAsync(DailyReportStatus.SpmReview, cancellationToken);
-        var spmApproved = await dailyReportRepository.GetByStatusAsync(DailyReportStatus.SpmApproved, cancellationToken);
+        var statuses = new[] { DailyReportStatus.SpmReview, DailyReportStatus.SpmApproved, DailyReportStatus.Rejected };
+        var allReports = await dailyReportRepository.GetByStatusesAsync(statuses, cancellationToken);
         
-        // Include rejected reports that were rejected from SpmReview (need to go back to SPM after foreman fix)
-        var rejected = await dailyReportRepository.GetByStatusAsync(DailyReportStatus.Rejected, cancellationToken);
-        var rejectedFromSpm = rejected.Where(r => 
-            r.StatusHistory.Any(h => h.ToStatus == DailyReportStatus.Rejected && h.FromStatus == DailyReportStatus.SpmReview) &&
-            r.StatusHistory.OrderByDescending(h => h.ChangedAt).First().ToStatus == DailyReportStatus.Rejected
-        ).ToList();
+        // Filter rejected reports to only those rejected from SpmReview
+        var result = allReports.Where(r =>
+        {
+            if (r.Status != DailyReportStatus.Rejected) return true;
+            
+            return r.StatusHistory.Any(h => h.ToStatus == DailyReportStatus.Rejected && h.FromStatus == DailyReportStatus.SpmReview) &&
+                   r.StatusHistory.OrderByDescending(h => h.ChangedAt).First().ToStatus == DailyReportStatus.Rejected;
+        }).ToList();
         
-        return spmReview.Concat(rejectedFromSpm).Concat(spmApproved).Select(ToResponse).ToList();
+        return result.Select(ToResponse).ToList();
     }
 
     public async Task<List<DailyReportResponse>> GetForSubcontractorReviewAsync(CancellationToken cancellationToken = default)
@@ -388,26 +389,92 @@ public class DailyReportService(
         if (crewIds.Count == 0)
             return [];
 
-        // Get reports in all statuses for this Subcontractor's crews
-        var submitted = await dailyReportRepository.GetByStatusAsync(DailyReportStatus.Submitted, cancellationToken);
-        var pmReview = await dailyReportRepository.GetByStatusAsync(DailyReportStatus.PmReview, cancellationToken);
-        var spmReview = await dailyReportRepository.GetByStatusAsync(DailyReportStatus.SpmReview, cancellationToken);
-        var subcontractorReview = await dailyReportRepository.GetByStatusAsync(DailyReportStatus.SubcontractorReview, cancellationToken);
-        var subcontractorApproved = await dailyReportRepository.GetByStatusAsync(DailyReportStatus.SubcontractorApproved, cancellationToken);
-        var rejected = await dailyReportRepository.GetByStatusAsync(DailyReportStatus.Rejected, cancellationToken);
+        // Get all reports in relevant statuses in ONE query
+        var statuses = new[]
+        {
+            DailyReportStatus.Submitted,
+            DailyReportStatus.PmReview,
+            DailyReportStatus.SpmReview,
+            DailyReportStatus.SubcontractorReview,
+            DailyReportStatus.SubcontractorApproved,
+            DailyReportStatus.Rejected
+        };
         
-        var allReports = submitted
-            .Concat(pmReview)
-            .Concat(spmReview)
-            .Concat(subcontractorReview)
-            .Concat(subcontractorApproved)
-            .Concat(rejected)
-            .ToList();
+        var allReports = await dailyReportRepository.GetByStatusesAsync(statuses, cancellationToken);
         
         // Filter to only this Subcontractor's crews
-        allReports = allReports.Where(r => r.SubcontractorCrewId.HasValue && crewIds.Contains(r.SubcontractorCrewId.Value)).ToList();
+        var result = allReports
+            .Where(r => r.SubcontractorCrewId.HasValue && crewIds.Contains(r.SubcontractorCrewId.Value))
+            .ToList();
         
-        return allReports.Select(ToResponse).ToList();
+        return result.Select(ToResponse).ToList();
+    }
+
+    public async Task<List<DailyReportListItemResponse>> GetForPmReviewListAsync(CancellationToken cancellationToken = default)
+    {
+        var statuses = new[]
+        {
+            DailyReportStatus.Submitted,
+            DailyReportStatus.PmReview,
+            DailyReportStatus.SpmReview,
+            DailyReportStatus.SpmApproved,
+            DailyReportStatus.SubcontractorReview,
+            DailyReportStatus.SubcontractorApproved,
+            DailyReportStatus.Rejected
+        };
+        
+        var allItems = await dailyReportRepository.GetListItemsByStatusesAsync(statuses, cancellationToken);
+        
+        // Filter out rejected reports that were NOT rejected from PM review
+        return allItems.Where(r =>
+        {
+            if (r.Status != DailyReportStatus.Rejected) return true;
+            return r.RejectedFromStatus != DailyReportStatus.SpmReview && 
+                   r.RejectedFromStatus != DailyReportStatus.SubcontractorReview;
+        }).ToList();
+    }
+
+    public async Task<List<DailyReportListItemResponse>> GetForSpmReviewListAsync(CancellationToken cancellationToken = default)
+    {
+        var statuses = new[] { DailyReportStatus.SpmReview, DailyReportStatus.SpmApproved, DailyReportStatus.Rejected };
+        var allItems = await dailyReportRepository.GetListItemsByStatusesAsync(statuses, cancellationToken);
+        
+        // Filter rejected reports to only those rejected from SpmReview
+        return allItems.Where(r =>
+        {
+            if (r.Status != DailyReportStatus.Rejected) return true;
+            return r.RejectedFromStatus == DailyReportStatus.SpmReview;
+        }).ToList();
+    }
+
+    public async Task<List<DailyReportListItemResponse>> GetForSubcontractorReviewListAsync(CancellationToken cancellationToken = default)
+    {
+        if (!currentUserContext.UserId.HasValue)
+            return [];
+
+        // Get Subcontractor's crews
+        var subcontractorCrews = await constructionRepository.GetSubcontractorCrewsAsync(currentUserContext.UserId.Value, cancellationToken);
+        var crewIds = subcontractorCrews.Select(c => c.Id).ToHashSet();
+        
+        if (crewIds.Count == 0)
+            return [];
+
+        var statuses = new[]
+        {
+            DailyReportStatus.Submitted,
+            DailyReportStatus.PmReview,
+            DailyReportStatus.SpmReview,
+            DailyReportStatus.SubcontractorReview,
+            DailyReportStatus.SubcontractorApproved,
+            DailyReportStatus.Rejected
+        };
+        
+        var allItems = await dailyReportRepository.GetListItemsByStatusesAsync(statuses, cancellationToken);
+        
+        // Filter to only this Subcontractor's crews
+        return allItems
+            .Where(r => r.SubcontractorCrewId.HasValue && crewIds.Contains(r.SubcontractorCrewId.Value))
+            .ToList();
     }
 
     public async Task<List<DailyReportCalendarResponse>> GetCalendarAsync(
@@ -487,6 +554,12 @@ public class DailyReportService(
         Guid commentId,
         CancellationToken cancellationToken = default)
     {
+        var role = currentUserContext.Role;
+        if (role is not "PM" and not "SPM" and not "Subcontractor")
+        {
+            throw new ValidationException("Tylko PM lub Podwykonawca może oznaczyć komentarz jako rozwiązany.");
+        }
+
         var report = await GetReportAsync(id, cancellationToken);
         var comment = report.Comments.FirstOrDefault(c => c.Id == commentId)
             ?? throw new KeyNotFoundException("Comment was not found.");
@@ -586,6 +659,29 @@ public class DailyReportService(
 
         var previousStatus = report.Status;
         report.Status = DailyReportStatus.SpmApproved;
+        
+        // Consume materials from crew's warehouse
+        if (report.MaterialUsages.Count > 0 && report.CrewId.HasValue)
+        {
+            var subWarehouse = await warehouseRepository.GetSubWarehouseByOwnerAsync(report.CrewId.Value, cancellationToken);
+            
+            if (subWarehouse != null)
+            {
+                foreach (var usage in report.MaterialUsages)
+                {
+                    await StockService.ConsumeReservedMaterialAsync(
+                        warehouseRepository,
+                        subWarehouse.Id,
+                        usage.MaterialId,
+                        usage.Quantity,
+                        StockMovementSourceType.DailyReportUsage,
+                        report.Id,
+                        currentUserContext.UserId ?? Guid.Empty,
+                        cancellationToken);
+                }
+            }
+        }
+        
         await RecordStatusChangeAsync(report.Id, previousStatus, report.Status, null, cancellationToken);
         await dailyReportRepository.SaveChangesAsync(cancellationToken);
         await auditService.LogActionAsync(currentUserContext.UserId ?? Guid.Empty, "SPM_APPROVE_DAILY_REPORT", "DailyReport", report.Id, new
@@ -629,11 +725,10 @@ public class DailyReportService(
         var previousStatus = report.Status;
         report.Status = DailyReportStatus.SubcontractorApproved;
         
-        // Consume reserved materials from the foreman's warehouse
-        if (report.MaterialUsages.Count > 0 && report.SubcontractorCrew?.CurrentForemanId != null)
+        // Consume materials from crew's warehouse
+        if (report.MaterialUsages.Count > 0 && report.SubcontractorCrewId.HasValue)
         {
-            var foremanId = report.SubcontractorCrew.CurrentForemanId.Value;
-            var subWarehouse = await warehouseRepository.GetSubWarehouseByOwnerAsync(foremanId, cancellationToken);
+            var subWarehouse = await warehouseRepository.GetSubWarehouseByOwnerAsync(report.SubcontractorCrewId.Value, cancellationToken);
             
             if (subWarehouse != null)
             {
@@ -732,7 +827,10 @@ public class DailyReportService(
                 entry.WorkType?.Unit,
                 entry.Description,
                 entry.Quantity,
-                entry.OrderedWork?.PlannedQuantity)).ToList(),
+                entry.OrderedWork?.PlannedQuantity,
+                entry.WorkerCount,
+                entry.HoursSpent,
+                entry.IsAddedByForeman)).ToList(),
             report.MaterialUsages.Select(entry => new MaterialUsageResponse(
                 entry.Id,
                 entry.DailyReportId,
@@ -747,6 +845,16 @@ public class DailyReportService(
                 h.FromStatus,
                 h.ToStatus,
                 h.Reason,
+                h.ChangedById,
+                h.ChangedBy?.Email,
+                h.ChangedAt)).ToList(),
+            report.ChangeHistory.OrderByDescending(h => h.ChangedAt).Select(h => new DailyReportChangeHistoryResponse(
+                h.Id,
+                h.EntryType,
+                h.EntryId,
+                h.ChangeType,
+                h.OldValues,
+                h.NewValues,
                 h.ChangedById,
                 h.ChangedBy?.Email,
                 h.ChangedAt)).ToList(),

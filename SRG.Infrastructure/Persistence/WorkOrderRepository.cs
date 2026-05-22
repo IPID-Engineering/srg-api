@@ -140,6 +140,8 @@ public class WorkOrderRepository(AppDbContext dbContext) : IWorkOrderRepository
             .Include(workOrder => workOrder.OrderedWorks)
             .ThenInclude(orderedWork => orderedWork.Installation)
             .Include(workOrder => workOrder.OrderedMaterials)
-            .ThenInclude(orderedMaterial => orderedMaterial.Material);
+            .ThenInclude(orderedMaterial => orderedMaterial.Material)
+            .Include(workOrder => workOrder.OrderedMaterials)
+            .ThenInclude(orderedMaterial => orderedMaterial.AddedBy);
     }
 }

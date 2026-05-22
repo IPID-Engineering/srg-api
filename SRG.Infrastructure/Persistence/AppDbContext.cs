@@ -26,6 +26,7 @@ public class AppDbContext(
     public DbSet<DailyReport> DailyReports => Set<DailyReport>();
     public DbSet<DailyReportComment> DailyReportComments => Set<DailyReportComment>();
     public DbSet<DailyReportStatusHistory> DailyReportStatusHistory => Set<DailyReportStatusHistory>();
+    public DbSet<DailyReportChangeHistory> DailyReportChangeHistory => Set<DailyReportChangeHistory>();
     public DbSet<DailyReportWorkOrder> DailyReportWorkOrders => Set<DailyReportWorkOrder>();
     public DbSet<WorkHour> WorkHours => Set<WorkHour>();
     public DbSet<WorkEntry> DailyReportWorkEntries => Set<WorkEntry>();
@@ -47,6 +48,7 @@ public class AppDbContext(
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<MaterialRequest> MaterialRequests => Set<MaterialRequest>();
+    public DbSet<InewiRecord> InewiRecords => Set<InewiRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

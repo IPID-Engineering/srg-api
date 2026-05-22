@@ -27,6 +27,7 @@ public record DailyReportResponse(
     List<MaterialUsageResponse> MaterialUsages,
     List<DailyReportCommentResponse> Comments,
     List<DailyReportStatusHistoryResponse> StatusHistory,
+    List<DailyReportChangeHistoryResponse> ChangeHistory,
     List<DailyReportWorkOrderResponse> WorkOrders);
 
 public record DailyReportWorkOrderResponse(
@@ -72,7 +73,10 @@ public record WorkEntryResponse(
     string? Unit,
     string? Description,
     decimal Quantity,
-    decimal? PlannedQuantity);
+    decimal? PlannedQuantity,
+    int WorkerCount,
+    decimal HoursSpent,
+    bool IsAddedByForeman);
 
 public record AddMaterialUsageRequest(Guid MaterialId, Guid? OrderedMaterialId, decimal Quantity);
 
@@ -114,3 +118,30 @@ public record DailyReportStatusHistoryResponse(
     Guid ChangedById,
     string? ChangedByEmail,
     DateTime ChangedAt);
+
+public record DailyReportChangeHistoryResponse(
+    Guid Id,
+    string EntryType,
+    Guid EntryId,
+    string ChangeType,
+    string? OldValues,
+    string? NewValues,
+    Guid ChangedById,
+    string? ChangedByEmail,
+    DateTime ChangedAt);
+
+/// <summary>
+/// Lightweight response for list views - contains only essential fields to avoid loading full entity graphs.
+/// </summary>
+public record DailyReportListItemResponse(
+    Guid Id,
+    DateOnly Date,
+    Guid? SubcontractorCrewId,
+    string? CrewName,
+    string? SubcontractorCrewName,
+    DailyReportStatus Status,
+    decimal TotalHours,
+    int WorkEntriesCount,
+    int MaterialUsagesCount,
+    bool HasUnresolvedComments,
+    DailyReportStatus? RejectedFromStatus);

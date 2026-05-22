@@ -1,4 +1,6 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
+using SRG.Application.Common;
 using SRG.Application.Persistence;
 using SRG.Domain.Entities;
 using SRG.Domain.Enums;
@@ -21,7 +23,8 @@ public interface IForemanDailyReportService
 
 public class ForemanDailyReportService(
     IDailyReportRepository dailyReportRepository,
-    IConstructionRepository constructionRepository) : IForemanDailyReportService
+    IConstructionRepository constructionRepository,
+    ICurrentUserContext currentUserContext) : IForemanDailyReportService
 {
     public async Task<ForemanDkpResponse> GetOrCreateForDateAsync(DateOnly date, Guid crewId, Guid userId, CancellationToken cancellationToken)
     {
@@ -80,7 +83,11 @@ public class ForemanDailyReportService(
         var existingHours = report.WorkHours.FirstOrDefault(wh => wh.SubcontractorWorkerId == request.WorkerId);
         if (existingHours != null)
         {
+            var oldValues = new { existingHours.Hours };
             existingHours.Hours = request.Hours;
+            var newValues = new { Hours = request.Hours };
+            
+            await RecordChangeAsync(reportId, "WorkHour", existingHours.Id, "Updated", oldValues, newValues, cancellationToken);
         }
         else
         {
@@ -92,6 +99,8 @@ public class ForemanDailyReportService(
                 Hours = request.Hours
             };
             await dailyReportRepository.AddWorkHoursAsync(newWorkHour, cancellationToken);
+            
+            await RecordChangeAsync(reportId, "WorkHour", newWorkHour.Id, "Created", null, new { newWorkHour.Hours, newWorkHour.SubcontractorWorkerId }, cancellationToken);
         }
 
         await dailyReportRepository.SaveChangesAsync(cancellationToken);
@@ -112,8 +121,26 @@ public class ForemanDailyReportService(
         
         if (existingEntry != null)
         {
+            var oldValues = new { 
+                existingEntry.Quantity, 
+                existingEntry.Description, 
+                existingEntry.WorkerCount, 
+                existingEntry.HoursSpent 
+            };
+            
             existingEntry.Quantity = request.Quantity;
             existingEntry.Description = request.Description;
+            existingEntry.WorkerCount = request.WorkerCount;
+            existingEntry.HoursSpent = request.HoursSpent;
+            
+            var newValues = new { 
+                Quantity = request.Quantity, 
+                Description = request.Description, 
+                WorkerCount = request.WorkerCount, 
+                HoursSpent = request.HoursSpent 
+            };
+            
+            await RecordChangeAsync(reportId, "WorkEntry", existingEntry.Id, "Updated", oldValues, newValues, cancellationToken);
         }
         else
         {
@@ -124,9 +151,22 @@ public class ForemanDailyReportService(
                 WorkTypeId = request.WorkTypeId,
                 OrderedWorkId = request.OrderedWorkId,
                 Quantity = request.Quantity,
-                Description = request.Description
+                Description = request.Description,
+                WorkerCount = request.WorkerCount,
+                HoursSpent = request.HoursSpent,
+                IsAddedByForeman = !request.OrderedWorkId.HasValue
             };
             await dailyReportRepository.AddWorkEntryAsync(workEntry, cancellationToken);
+            
+            await RecordChangeAsync(reportId, "WorkEntry", workEntry.Id, "Created", null, new { 
+                workEntry.WorkTypeId, 
+                workEntry.Quantity, 
+                workEntry.Description, 
+                workEntry.WorkerCount, 
+                workEntry.HoursSpent,
+                workEntry.OrderedWorkId,
+                workEntry.IsAddedByForeman
+            }, cancellationToken);
         }
         await dailyReportRepository.SaveChangesAsync(cancellationToken);
 
@@ -143,7 +183,11 @@ public class ForemanDailyReportService(
         var existingUsage = report.MaterialUsages.FirstOrDefault(mu => mu.MaterialId == request.MaterialId);
         if (existingUsage != null)
         {
+            var oldValues = new { existingUsage.Quantity };
             existingUsage.Quantity = request.Quantity;
+            var newValues = new { Quantity = request.Quantity };
+            
+            await RecordChangeAsync(reportId, "MaterialUsage", existingUsage.Id, "Updated", oldValues, newValues, cancellationToken);
         }
         else
         {
@@ -155,6 +199,8 @@ public class ForemanDailyReportService(
                 Quantity = request.Quantity
             };
             await dailyReportRepository.AddMaterialAsync(materialUsage, cancellationToken);
+            
+            await RecordChangeAsync(reportId, "MaterialUsage", materialUsage.Id, "Created", null, new { materialUsage.MaterialId, materialUsage.Quantity }, cancellationToken);
         }
         await dailyReportRepository.SaveChangesAsync(cancellationToken);
 
@@ -205,7 +251,7 @@ public class ForemanDailyReportService(
             AddedAt = DateTime.UtcNow
         };
 
-        report.DailyReportWorkOrders.Add(dailyReportWorkOrder);
+        await dailyReportRepository.AddDailyReportWorkOrderAsync(dailyReportWorkOrder, cancellationToken);
         await dailyReportRepository.SaveChangesAsync(cancellationToken);
 
         return await GetReportResponseAsync(reportId, cancellationToken);
@@ -221,7 +267,7 @@ public class ForemanDailyReportService(
         var dailyReportWorkOrder = report.DailyReportWorkOrders.FirstOrDefault(drwo => drwo.WorkOrderId == workOrderId)
             ?? throw new KeyNotFoundException("To zlecenie nie jest przypisane do tej karty.");
 
-        report.DailyReportWorkOrders.Remove(dailyReportWorkOrder);
+        await dailyReportRepository.RemoveDailyReportWorkOrderAsync(dailyReportWorkOrder, cancellationToken);
         await dailyReportRepository.SaveChangesAsync(cancellationToken);
 
         return await GetReportResponseAsync(reportId, cancellationToken);
@@ -250,6 +296,22 @@ public class ForemanDailyReportService(
             throw new KeyNotFoundException("Karta pracy nie została znaleziona.");
 
         return report;
+    }
+
+    private async Task RecordChangeAsync(Guid reportId, string entryType, Guid entryId, string changeType, object? oldValues, object? newValues, CancellationToken cancellationToken)
+    {
+        var history = new DailyReportChangeHistory
+        {
+            DailyReportId = reportId,
+            EntryType = entryType,
+            EntryId = entryId,
+            ChangeType = changeType,
+            OldValues = oldValues != null ? JsonSerializer.Serialize(oldValues) : null,
+            NewValues = newValues != null ? JsonSerializer.Serialize(newValues) : null,
+            ChangedById = currentUserContext.UserId ?? Guid.Empty,
+            ChangedAt = DateTime.UtcNow
+        };
+        await dailyReportRepository.AddChangeHistoryAsync(history, cancellationToken);
     }
 
     private async Task<DailyReport> CreateReportForDateAsync(Guid crewId, Guid userId, DateOnly date, CancellationToken cancellationToken)
@@ -323,7 +385,10 @@ public class ForemanDailyReportService(
                 Quantity = we.Quantity,
                 Unit = we.WorkType?.Unit ?? "szt",
                 PlannedQuantity = we.OrderedWork?.PlannedQuantity,
-                Description = we.Description
+                Description = we.Description,
+                WorkerCount = we.WorkerCount,
+                HoursSpent = we.HoursSpent,
+                IsAddedByForeman = we.IsAddedByForeman
             }).ToList(),
             MaterialUsages = report.MaterialUsages.Select(mu => new ForemanMaterialUsageItem
             {
@@ -436,6 +501,9 @@ public class ForemanWorkEntryItem
     public required string Unit { get; set; }
     public decimal? PlannedQuantity { get; set; }
     public string? Description { get; set; }
+    public int WorkerCount { get; set; }
+    public decimal HoursSpent { get; set; }
+    public bool IsAddedByForeman { get; set; }
 }
 
 public class ForemanMaterialUsageItem
@@ -457,5 +525,5 @@ public class ForemanDkpCalendarItem
 }
 
 public record AddForemanHoursRequest(Guid WorkerId, decimal Hours);
-public record AddForemanWorkRequest(Guid WorkTypeId, decimal Quantity, string? Description, Guid? OrderedWorkId);
+public record AddForemanWorkRequest(Guid WorkTypeId, decimal Quantity, string? Description, Guid? OrderedWorkId, int WorkerCount = 0, decimal HoursSpent = 0);
 public record AddForemanMaterialRequest(Guid MaterialId, decimal Quantity);

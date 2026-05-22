@@ -31,6 +31,7 @@ public static class DependencyInjection
         services.AddScoped<IAuditService, AuditService>();
         services.AddScoped<IAnalyticsService, AnalyticsService>();
         services.AddScoped<IExportService, ExportService>();
+        services.AddScoped<IInewiRepository, InewiRepository>();
         services.AddHostedService<DailyReportAutoCreationService>();
 
         return services;

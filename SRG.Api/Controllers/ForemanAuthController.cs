@@ -15,8 +15,19 @@ public class ForemanAuthController(IForemanAuthService foremanAuthService) : Con
         ForemanLoginRequest request,
         CancellationToken cancellationToken)
     {
-        var response = await foremanAuthService.LoginAsync(request, cancellationToken);
-        return Ok(response);
+        try
+        {
+            var response = await foremanAuthService.LoginAsync(request, cancellationToken);
+            return Ok(response);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Unauthorized(new { message = "Nieprawidłowy email lub hasło." });
+        }
+        catch (System.ComponentModel.DataAnnotations.ValidationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpPost("change-password")]

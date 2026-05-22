@@ -11,4 +11,7 @@ public class WorkEntry
     public OrderedWork? OrderedWork { get; set; }
     public string? Description { get; set; }
     public decimal Quantity { get; set; }
+    public int WorkerCount { get; set; }
+    public decimal HoursSpent { get; set; }
+    public bool IsAddedByForeman { get; set; }
 }

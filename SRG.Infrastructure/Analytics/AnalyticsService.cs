@@ -151,7 +151,27 @@ public class AnalyticsService(AppDbContext dbContext) : IAnalyticsService
 
         hoursOverTime = [.. hoursOverTime.OrderBy(row => row.Date)];
 
-        return new ForemanAnalyticsResponse(totalDkp, totalHours, totalWorkEntries, hoursOverTime);
+        var productivityData = await dbContext.DailyReportWorkEntries
+            .AsNoTracking()
+            .Where(entry => reportIds.Contains(entry.DailyReportId))
+            .Include(entry => entry.WorkType)
+            .GroupBy(entry => new { entry.WorkTypeId, entry.WorkType!.Name, entry.WorkType.Code, entry.WorkType.Unit })
+            .Select(group => new ProductivityByWorkTypeResponse(
+                group.Key.WorkTypeId,
+                group.Key.Name,
+                group.Key.Code ?? "",
+                group.Key.Unit,
+                group.Sum(e => e.Quantity),
+                group.Sum(e => e.WorkerCount * e.HoursSpent),
+                group.Sum(e => e.WorkerCount * e.HoursSpent) > 0
+                    ? group.Sum(e => e.Quantity) / group.Sum(e => e.WorkerCount * e.HoursSpent)
+                    : 0))
+            .OrderByDescending(p => p.TotalQuantity)
+            .ToListAsync(cancellationToken);
+
+        var totalManHours = productivityData.Sum(p => p.TotalManHours);
+
+        return new ForemanAnalyticsResponse(totalDkp, totalHours, totalWorkEntries, totalManHours, hoursOverTime, productivityData);
     }
 
     public async Task<CrewAnalyticsResponse> GetCrewAnalyticsAsync(

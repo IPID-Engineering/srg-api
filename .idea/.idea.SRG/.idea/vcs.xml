@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="VcsDirectoryMappings">
+    <mapping directory="$PROJECT_DIR$/../../admin" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../../api" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../../ionway" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../../ionway/api" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../../ionway/mobile" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../../ionway/web" vcs="Git" />
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/../web" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/../../web" vcs="Git" />
   </component>
 </project>

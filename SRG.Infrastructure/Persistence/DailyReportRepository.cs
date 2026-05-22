@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using SRG.Application.DailyReports;
 using SRG.Application.Persistence;
 using SRG.Domain.Entities;
 using SRG.Domain.Enums;
@@ -49,6 +50,40 @@ public class DailyReportRepository(AppDbContext dbContext) : IDailyReportReposit
             .ToListAsync(cancellationToken);
     }
 
+    public Task<List<DailyReport>> GetByStatusesAsync(IEnumerable<DailyReportStatus> statuses, CancellationToken cancellationToken = default)
+    {
+        var statusList = statuses.ToList();
+        return DailyReportQuery()
+            .Where(dailyReport => statusList.Contains(dailyReport.Status))
+            .OrderByDescending(dailyReport => dailyReport.Date)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<List<DailyReportListItemResponse>> GetListItemsByStatusesAsync(IEnumerable<DailyReportStatus> statuses, CancellationToken cancellationToken = default)
+    {
+        var statusList = statuses.ToList();
+        return dbContext.DailyReports
+            .Where(dr => statusList.Contains(dr.Status))
+            .OrderByDescending(dr => dr.Date)
+            .Select(dr => new DailyReportListItemResponse(
+                dr.Id,
+                dr.Date,
+                dr.SubcontractorCrewId,
+                dr.Crew != null ? dr.Crew.Name : null,
+                dr.SubcontractorCrew != null ? dr.SubcontractorCrew.Name : null,
+                dr.Status,
+                dr.WorkHours.Sum(wh => wh.Hours),
+                dr.WorkEntries.Count,
+                dr.MaterialUsages.Count,
+                dr.Comments.Any(c => !c.IsResolved && c.ParentCommentId == null),
+                dr.StatusHistory
+                    .Where(h => h.ToStatus == DailyReportStatus.Rejected)
+                    .OrderByDescending(h => h.ChangedAt)
+                    .Select(h => (DailyReportStatus?)h.FromStatus)
+                    .FirstOrDefault()))
+            .ToListAsync(cancellationToken);
+    }
+
     public Task<bool> ExistsForCrewDateAsync(Guid crewId, DateOnly date, CancellationToken cancellationToken = default)
     {
         return dbContext.DailyReports.AnyAsync(
@@ -96,6 +131,22 @@ public class DailyReportRepository(AppDbContext dbContext) : IDailyReportReposit
     public async Task AddStatusHistoryAsync(DailyReportStatusHistory history, CancellationToken cancellationToken = default)
     {
         await dbContext.DailyReportStatusHistory.AddAsync(history, cancellationToken);
+    }
+
+    public async Task AddChangeHistoryAsync(DailyReportChangeHistory history, CancellationToken cancellationToken = default)
+    {
+        await dbContext.DailyReportChangeHistory.AddAsync(history, cancellationToken);
+    }
+
+    public async Task AddDailyReportWorkOrderAsync(DailyReportWorkOrder entry, CancellationToken cancellationToken = default)
+    {
+        await dbContext.DailyReportWorkOrders.AddAsync(entry, cancellationToken);
+    }
+
+    public Task RemoveDailyReportWorkOrderAsync(DailyReportWorkOrder entry, CancellationToken cancellationToken = default)
+    {
+        dbContext.DailyReportWorkOrders.Remove(entry);
+        return Task.CompletedTask;
     }
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
@@ -155,6 +206,8 @@ public class DailyReportRepository(AppDbContext dbContext) : IDailyReportReposit
             .ThenInclude(comment => comment.Replies)
             .ThenInclude(reply => reply.SubcontractorWorker)
             .Include(dailyReport => dailyReport.StatusHistory)
+            .ThenInclude(history => history.ChangedBy)
+            .Include(dailyReport => dailyReport.ChangeHistory)
             .ThenInclude(history => history.ChangedBy)
             .Include(dailyReport => dailyReport.DailyReportWorkOrders)
             .ThenInclude(drwo => drwo.WorkOrder)

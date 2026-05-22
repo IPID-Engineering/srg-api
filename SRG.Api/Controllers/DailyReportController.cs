@@ -63,6 +63,13 @@ public class DailyReportController(IDailyReportService dailyReportService) : Con
         return Ok(await dailyReportService.GetForPmReviewAsync(cancellationToken));
     }
 
+    [HttpGet("pm-review-list")]
+    [Authorize(Roles = "PM")]
+    public async Task<ActionResult<List<DailyReportListItemResponse>>> GetForPmReviewList(CancellationToken cancellationToken)
+    {
+        return Ok(await dailyReportService.GetForPmReviewListAsync(cancellationToken));
+    }
+
     [HttpGet("spm-review")]
     [Authorize(Roles = "SPM")]
     public async Task<ActionResult<List<DailyReportResponse>>> GetForSpmReview(CancellationToken cancellationToken)
@@ -70,11 +77,25 @@ public class DailyReportController(IDailyReportService dailyReportService) : Con
         return Ok(await dailyReportService.GetForSpmReviewAsync(cancellationToken));
     }
 
+    [HttpGet("spm-review-list")]
+    [Authorize(Roles = "SPM")]
+    public async Task<ActionResult<List<DailyReportListItemResponse>>> GetForSpmReviewList(CancellationToken cancellationToken)
+    {
+        return Ok(await dailyReportService.GetForSpmReviewListAsync(cancellationToken));
+    }
+
     [HttpGet("subcontractor-review")]
     [Authorize(Roles = "Subcontractor")]
     public async Task<ActionResult<List<DailyReportResponse>>> GetForSubcontractorReview(CancellationToken cancellationToken)
     {
         return Ok(await dailyReportService.GetForSubcontractorReviewAsync(cancellationToken));
+    }
+
+    [HttpGet("subcontractor-review-list")]
+    [Authorize(Roles = "Subcontractor")]
+    public async Task<ActionResult<List<DailyReportListItemResponse>>> GetForSubcontractorReviewList(CancellationToken cancellationToken)
+    {
+        return Ok(await dailyReportService.GetForSubcontractorReviewListAsync(cancellationToken));
     }
 
     [HttpGet("calendar")]

@@ -12,11 +12,12 @@ public class WorkOrderService(
     IWarehouseRepository warehouseRepository,
     IAuditService auditService) : IWorkOrderService
 {
-    public async Task<List<WorkOrderResponse>> GetWorkOrdersAsync(Guid userId, string role, CancellationToken cancellationToken = default)
+    public async Task<List<WorkOrderResponse>> GetWorkOrdersAsync(Guid userId, string role, Guid? crewId, CancellationToken cancellationToken = default)
     {
         var workOrders = role switch
         {
-            nameof(UserRole.Foreman) => await GetForemanWorkOrdersAsync(userId, cancellationToken),
+            "SubcontractorForeman" when crewId.HasValue => await GetSubcontractorForemanWorkOrdersAsync(crewId.Value, cancellationToken),
+            nameof(UserRole.Foreman) when crewId.HasValue => await GetForemanWorkOrdersAsync(crewId.Value, cancellationToken),
             _ => await workOrderRepository.GetWorkOrdersAsync(cancellationToken),
         };
 
@@ -142,6 +143,7 @@ public class WorkOrderService(
         Guid id,
         AddOrderedMaterialRequest request,
         Guid userId,
+        string userRole,
         CancellationToken cancellationToken = default)
     {
         var workOrder = await GetWorkOrderEntityAsync(id, cancellationToken);
@@ -154,6 +156,8 @@ public class WorkOrderService(
             MaterialId = request.MaterialId,
             PlannedQuantity = PositiveQuantity(request.PlannedQuantity),
             Unit = RequiredText(request.Unit, "Unit"),
+            AddedById = userId,
+            AddedByRole = userRole,
             CreatedAt = DateTime.UtcNow,
         };
 
@@ -165,6 +169,7 @@ public class WorkOrderService(
             orderedMaterial.MaterialId,
             orderedMaterial.PlannedQuantity,
             orderedMaterial.Unit,
+            orderedMaterial.AddedByRole,
         }, cancellationToken);
 
         return ToResponse(await GetWorkOrderEntityAsync(id, cancellationToken));
@@ -250,17 +255,16 @@ public class WorkOrderService(
         return ToResponse(workOrder);
     }
 
-    private async Task<List<WorkOrder>> GetForemanWorkOrdersAsync(Guid userId, CancellationToken cancellationToken)
+    private async Task<List<WorkOrder>> GetForemanWorkOrdersAsync(Guid crewId, CancellationToken cancellationToken)
     {
         var workOrders = await workOrderRepository.GetWorkOrdersAsync(cancellationToken);
-        var ownedCrewIds = workOrders
-            .Where(workOrder => workOrder.Crew is not null)
-            .Select(workOrder => workOrder.Crew!)
-            .Where(crew => crew.CreatedById == userId || crew.Worker.Any(worker => worker.CreatedById == userId))
-            .Select(crew => crew.Id)
-            .ToHashSet();
+        return workOrders.Where(workOrder => workOrder.CrewId == crewId).ToList();
+    }
 
-        return workOrders.Where(workOrder => workOrder.CrewId is not null && ownedCrewIds.Contains(workOrder.CrewId.Value)).ToList();
+    private async Task<List<WorkOrder>> GetSubcontractorForemanWorkOrdersAsync(Guid crewId, CancellationToken cancellationToken)
+    {
+        var workOrders = await workOrderRepository.GetWorkOrdersAsync(cancellationToken);
+        return workOrders.Where(workOrder => workOrder.SubcontractorCrewId == crewId).ToList();
     }
 
     private async Task<WorkOrder> GetWorkOrderEntityAsync(Guid id, CancellationToken cancellationToken)
@@ -371,6 +375,9 @@ public class WorkOrderService(
                 material.Material?.Name,
                 material.PlannedQuantity,
                 material.Unit,
+                material.AddedById,
+                material.AddedBy is { } addedBy ? $"{addedBy.FirstName} {addedBy.LastName}" : null,
+                material.AddedByRole,
                 material.CreatedAt)).ToList());
     }
 

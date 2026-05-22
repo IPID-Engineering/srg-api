@@ -225,6 +225,51 @@ namespace SRG.Infrastructure.Persistence.Migrations
                     b.ToTable("DailyReports", (string)null);
                 });
 
+            modelBuilder.Entity("SRG.Domain.Entities.DailyReportChangeHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ChangeType")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ChangedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("DailyReportId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("EntryId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("EntryType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("NewValues")
+                        .HasColumnType("text");
+
+                    b.Property<string>("OldValues")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ChangedById");
+
+                    b.HasIndex("DailyReportId");
+
+                    b.HasIndex("DailyReportId", "EntryId");
+
+                    b.ToTable("DailyReportChangeHistory");
+                });
+
             modelBuilder.Entity("SRG.Domain.Entities.DailyReportComment", b =>
                 {
                     b.Property<Guid>("Id")
@@ -456,6 +501,47 @@ namespace SRG.Infrastructure.Persistence.Migrations
                     b.ToTable("GoodsReceivedVoucherItems", (string)null);
                 });
 
+            modelBuilder.Entity("SRG.Domain.Entities.InewiRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<decimal>("Hours")
+                        .HasPrecision(8, 2)
+                        .HasColumnType("numeric(8,2)");
+
+                    b.Property<DateTime>("ImportedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ImportedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SourceFileName")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<Guid>("SubcontractorCrewId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("WorkerName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ImportedById");
+
+                    b.HasIndex("SubcontractorCrewId", "Date", "WorkerName")
+                        .IsUnique();
+
+                    b.ToTable("InewiRecords", (string)null);
+                });
+
             modelBuilder.Entity("SRG.Domain.Entities.Installation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -662,6 +748,12 @@ namespace SRG.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("AddedById")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AddedByRole")
+                        .HasColumnType("text");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -681,6 +773,8 @@ namespace SRG.Infrastructure.Persistence.Migrations
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AddedById");
 
                     b.HasIndex("MaterialId");
 
@@ -1205,6 +1299,17 @@ namespace SRG.Infrastructure.Persistence.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
 
+                    b.Property<decimal>("HoursSpent")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(8, 2)
+                        .HasColumnType("numeric(8,2)")
+                        .HasDefaultValue(0m);
+
+                    b.Property<bool>("IsAddedByForeman")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<Guid?>("OrderedWorkId")
                         .HasColumnType("uuid");
 
@@ -1214,6 +1319,11 @@ namespace SRG.Infrastructure.Persistence.Migrations
 
                     b.Property<Guid>("WorkTypeId")
                         .HasColumnType("uuid");
+
+                    b.Property<int>("WorkerCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
 
                     b.HasKey("Id");
 
@@ -1357,7 +1467,10 @@ namespace SRG.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Unit")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("szt");
 
                     b.HasKey("Id");
 
@@ -1507,6 +1620,25 @@ namespace SRG.Infrastructure.Persistence.Migrations
                     b.Navigation("WorkOrder");
                 });
 
+            modelBuilder.Entity("SRG.Domain.Entities.DailyReportChangeHistory", b =>
+                {
+                    b.HasOne("SRG.Domain.Entities.User", "ChangedBy")
+                        .WithMany()
+                        .HasForeignKey("ChangedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SRG.Domain.Entities.DailyReport", "DailyReport")
+                        .WithMany("ChangeHistory")
+                        .HasForeignKey("DailyReportId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ChangedBy");
+
+                    b.Navigation("DailyReport");
+                });
+
             modelBuilder.Entity("SRG.Domain.Entities.DailyReportComment", b =>
                 {
                     b.HasOne("SRG.Domain.Entities.User", "Author")
@@ -1613,6 +1745,25 @@ namespace SRG.Infrastructure.Persistence.Migrations
                     b.Navigation("GoodsReceivedVoucher");
 
                     b.Navigation("Material");
+                });
+
+            modelBuilder.Entity("SRG.Domain.Entities.InewiRecord", b =>
+                {
+                    b.HasOne("SRG.Domain.Entities.User", "ImportedBy")
+                        .WithMany()
+                        .HasForeignKey("ImportedById")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SRG.Domain.Entities.SubcontractorCrew", "SubcontractorCrew")
+                        .WithMany()
+                        .HasForeignKey("SubcontractorCrewId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ImportedBy");
+
+                    b.Navigation("SubcontractorCrew");
                 });
 
             modelBuilder.Entity("SRG.Domain.Entities.Installation", b =>
@@ -1738,6 +1889,10 @@ namespace SRG.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("SRG.Domain.Entities.OrderedMaterial", b =>
                 {
+                    b.HasOne("SRG.Domain.Entities.User", "AddedBy")
+                        .WithMany()
+                        .HasForeignKey("AddedById");
+
                     b.HasOne("SRG.Domain.Entities.Material", "Material")
                         .WithMany()
                         .HasForeignKey("MaterialId")
@@ -1749,6 +1904,8 @@ namespace SRG.Infrastructure.Persistence.Migrations
                         .HasForeignKey("WorkOrderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("AddedBy");
 
                     b.Navigation("Material");
 
@@ -2157,6 +2314,8 @@ namespace SRG.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("SRG.Domain.Entities.DailyReport", b =>
                 {
+                    b.Navigation("ChangeHistory");
+
                     b.Navigation("Comments");
 
                     b.Navigation("DailyReportWorkOrders");

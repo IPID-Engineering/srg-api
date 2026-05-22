@@ -37,21 +37,21 @@ public class WarehouseController(IWarehouseService warehouseService) : Controlle
     }
 
     [HttpGet("sub/{ownerId:guid}")]
-    [Authorize(Roles = "Logistician")]
+    [Authorize(Roles = "Logistician,PM,SPM")]
     public async Task<ActionResult<WarehouseResponse>> GetSubWarehouse(Guid ownerId, CancellationToken cancellationToken)
     {
         return Ok(await warehouseService.GetSubWarehouseAsync(ownerId, cancellationToken));
     }
 
     [HttpGet("sub")]
-    [Authorize(Roles = "Logistician")]
+    [Authorize(Roles = "Logistician,PM,SPM")]
     public async Task<ActionResult<List<WarehouseResponse>>> GetAllSubWarehouses(CancellationToken cancellationToken)
     {
         return Ok(await warehouseService.GetAllSubWarehousesAsync(cancellationToken));
     }
 
     [HttpGet("{id:guid}/stock")]
-    [Authorize(Roles = "Logistician,Foreman,SubcontractorForeman")]
+    [Authorize(Roles = "Logistician,Foreman,SubcontractorForeman,PM,SPM")]
     public async Task<ActionResult<List<StockResponse>>> GetStock(Guid id, CancellationToken cancellationToken)
     {
         try
@@ -65,7 +65,7 @@ public class WarehouseController(IWarehouseService warehouseService) : Controlle
     }
 
     [HttpGet("{id:guid}/movements")]
-    [Authorize(Roles = "Logistician")]
+    [Authorize(Roles = "Logistician,PM,SPM")]
     public async Task<ActionResult<List<StockMovementResponse>>> GetMovements(Guid id, CancellationToken cancellationToken)
     {
         try

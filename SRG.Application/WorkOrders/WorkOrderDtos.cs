@@ -78,6 +78,9 @@ public record OrderedMaterialResponse(
     string? MaterialName,
     decimal PlannedQuantity,
     string Unit,
+    Guid? AddedById,
+    string? AddedByName,
+    string? AddedByRole,
     DateTime CreatedAt);
 
 public record WorkOrderProgressResponse(

@@ -3,6 +3,7 @@ using SRG.Application.Analytics;
 using SRG.Application.Auth;
 using SRG.Application.Construction;
 using SRG.Application.DailyReports;
+using SRG.Application.Inewi;
 using SRG.Application.MaterialRequests;
 using SRG.Application.Warehouses;
 using SRG.Application.WorkOrders;
@@ -39,6 +40,7 @@ public static class DependencyInjection
         services.AddScoped<IWorkOrderService, WorkOrderService>();
         services.AddScoped<ICrewStatsService, CrewStatsService>();
         services.AddScoped<IMaterialRequestService, MaterialRequestService>();
+        services.AddScoped<IInewiService, InewiService>();
 
         return services;
     }

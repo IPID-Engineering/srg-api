@@ -58,10 +58,33 @@ public class AuthController(IAuthService authService) : ControllerBase
     }
 
     [HttpGet("users")]
-    [Authorize(Roles = "Admin,Subcontractor")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<List<UserResponse>>> GetAllUsers(CancellationToken cancellationToken)
     {
-        return Ok(await authService.GetAllUsersAsync(cancellationToken));
+        try
+        {
+            return Ok(await authService.GetAllUsersAsync(cancellationToken));
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, new { message = "Nie udało się pobrać listy użytkowników." });
+        }
+    }
+
+    [HttpGet("users/pm-list")]
+    [Authorize(Roles = "Subcontractor")]
+    public async Task<ActionResult<List<UserResponse>>> GetPmUsers(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var allUsers = await authService.GetAllUsersAsync(cancellationToken);
+            var pmUsers = allUsers.Where(u => u.Role == SRG.Domain.Enums.UserRole.PM || u.Role == SRG.Domain.Enums.UserRole.SPM).ToList();
+            return Ok(pmUsers);
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, new { message = "Nie udało się pobrać listy PM." });
+        }
     }
 
     [HttpPut("users/{id:guid}")]

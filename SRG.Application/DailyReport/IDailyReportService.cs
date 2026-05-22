@@ -13,6 +13,21 @@ public interface IDailyReportService
     Task<List<DailyReportResponse>> GetForPmReviewAsync(CancellationToken cancellationToken = default);
     Task<List<DailyReportResponse>> GetForSpmReviewAsync(CancellationToken cancellationToken = default);
     Task<List<DailyReportResponse>> GetForSubcontractorReviewAsync(CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Returns lightweight list items for PM review - much faster than full response.
+    /// </summary>
+    Task<List<DailyReportListItemResponse>> GetForPmReviewListAsync(CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Returns lightweight list items for Subcontractor review - much faster than full response.
+    /// </summary>
+    Task<List<DailyReportListItemResponse>> GetForSubcontractorReviewListAsync(CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Returns lightweight list items for SPM review - much faster than full response.
+    /// </summary>
+    Task<List<DailyReportListItemResponse>> GetForSpmReviewListAsync(CancellationToken cancellationToken = default);
     Task<List<DailyReportCalendarResponse>> GetCalendarAsync(Guid crewId, int year, int month, CancellationToken cancellationToken = default);
     Task<DailyReportResponse> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<DailyReportResponse> UpdateNotesAsync(Guid id, UpdateDailyReportNotesRequest request, CancellationToken cancellationToken = default);

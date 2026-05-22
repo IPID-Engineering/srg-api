@@ -31,9 +31,20 @@ public record ForemanAnalyticsResponse(
     int TotalDailyReport,
     decimal TotalHours,
     int TotalWorkEntries,
-    List<HoursOverTimeResponse> HoursOverTime);
+    decimal TotalManHours,
+    List<HoursOverTimeResponse> HoursOverTime,
+    List<ProductivityByWorkTypeResponse> ProductivityByWorkType);
 
 public record HoursOverTimeResponse(DateOnly Date, decimal Hours);
+
+public record ProductivityByWorkTypeResponse(
+    Guid WorkTypeId,
+    string WorkTypeName,
+    string WorkTypeCode,
+    string Unit,
+    decimal TotalQuantity,
+    decimal TotalManHours,
+    decimal ProductivityRate);
 
 public record CrewAnalyticsResponse(
     Guid CrewId,

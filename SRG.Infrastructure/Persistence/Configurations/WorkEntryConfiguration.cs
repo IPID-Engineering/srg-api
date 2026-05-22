@@ -19,6 +19,16 @@ public class WorkEntryConfiguration : IEntityTypeConfiguration<WorkEntry>
             .HasPrecision(12, 2)
             .IsRequired();
 
+        builder.Property(entry => entry.WorkerCount)
+            .HasDefaultValue(0);
+
+        builder.Property(entry => entry.HoursSpent)
+            .HasPrecision(8, 2)
+            .HasDefaultValue(0);
+
+        builder.Property(entry => entry.IsAddedByForeman)
+            .HasDefaultValue(false);
+
         builder.HasOne(entry => entry.WorkType)
             .WithMany(workType => workType.WorkEntries)
             .HasForeignKey(entry => entry.WorkTypeId)

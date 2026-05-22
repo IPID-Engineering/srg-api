@@ -9,6 +9,9 @@ public class OrderedMaterial
     public Material? Material { get; set; }
     public decimal PlannedQuantity { get; set; }
     public required string Unit { get; set; }
+    public Guid? AddedById { get; set; }
+    public User? AddedBy { get; set; }
+    public string? AddedByRole { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public ICollection<MaterialUsage> MaterialUsages { get; set; } = [];
 }
