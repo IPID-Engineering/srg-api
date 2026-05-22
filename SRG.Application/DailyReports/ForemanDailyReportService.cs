@@ -308,7 +308,9 @@ public class ForemanDailyReportService(
             ChangeType = changeType,
             OldValues = oldValues != null ? JsonSerializer.Serialize(oldValues) : null,
             NewValues = newValues != null ? JsonSerializer.Serialize(newValues) : null,
-            ChangedById = currentUserContext.UserId ?? Guid.Empty,
+            ChangedById = null, // Foreman is not in Users table
+            ChangedByWorkerId = currentUserContext.UserId,
+            ChangedByEmail = currentUserContext.Email,
             ChangedAt = DateTime.UtcNow
         };
         await dailyReportRepository.AddChangeHistoryAsync(history, cancellationToken);

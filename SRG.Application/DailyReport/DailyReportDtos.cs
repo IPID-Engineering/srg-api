@@ -126,7 +126,7 @@ public record DailyReportChangeHistoryResponse(
     string ChangeType,
     string? OldValues,
     string? NewValues,
-    Guid ChangedById,
+    Guid? ChangedById,
     string? ChangedByEmail,
     DateTime ChangedAt);
 

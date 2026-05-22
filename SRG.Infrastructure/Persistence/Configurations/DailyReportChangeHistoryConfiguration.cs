@@ -23,7 +23,10 @@ public class DailyReportChangeHistoryConfiguration : IEntityTypeConfiguration<Da
         builder.HasOne(h => h.ChangedBy)
             .WithMany()
             .HasForeignKey(h => h.ChangedById)
+            .IsRequired(false)
             .OnDelete(DeleteBehavior.Restrict);
+            
+        builder.Property(h => h.ChangedByEmail).HasMaxLength(256);
             
         builder.HasIndex(h => h.DailyReportId);
         builder.HasIndex(h => new { h.DailyReportId, h.EntryId });

@@ -855,8 +855,8 @@ public class DailyReportService(
                 h.ChangeType,
                 h.OldValues,
                 h.NewValues,
-                h.ChangedById,
-                h.ChangedBy?.Email,
+                h.ChangedById ?? h.ChangedByWorkerId,
+                h.ChangedBy?.Email ?? h.ChangedByEmail,
                 h.ChangedAt)).ToList(),
             report.DailyReportWorkOrders.Select(drwo => new DailyReportWorkOrderResponse(
                 drwo.WorkOrderId,
