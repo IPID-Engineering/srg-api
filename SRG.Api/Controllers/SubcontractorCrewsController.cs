@@ -3,13 +3,14 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SRG.Api.Extensions;
 using SRG.Application.Construction;
+using SRG.Application.DailyReports;
 
 namespace SRG.Api.Controllers;
 
 [ApiController]
 [Route("subcontractor/crews")]
 [Authorize]
-public class SubcontractorCrewsController(ISubcontractorCrewService crewService) : ControllerBase
+public class SubcontractorCrewsController(ISubcontractorCrewService crewService, IDailyReportService dailyReportService) : ControllerBase
 {
     [HttpGet]
     [Authorize(Roles = "Subcontractor")]
@@ -209,6 +210,29 @@ public class SubcontractorCrewsController(ISubcontractorCrewService crewService)
         {
             await crewService.RevokePmAccessAsync(id, pmUserId, User.GetUserId(), cancellationToken);
             return NoContent();
+        }
+        catch (ValidationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new { message = exception.Message });
+        }
+    }
+
+    [HttpGet("{id:guid}/calendar")]
+    [Authorize(Roles = "Subcontractor")]
+    public async Task<ActionResult<List<DailyReportCalendarResponse>>> GetCrewCalendar(
+        Guid id,
+        [FromQuery] int year,
+        [FromQuery] int month,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await crewService.GetByIdAsync(id, User.GetUserId(), cancellationToken);
+            return Ok(await dailyReportService.GetCalendarAsync(id, year, month, cancellationToken));
         }
         catch (ValidationException exception)
         {
