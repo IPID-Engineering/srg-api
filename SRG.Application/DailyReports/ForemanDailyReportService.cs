@@ -407,11 +407,19 @@ public class ForemanDailyReportService(
                     Id = c.Id,
                     Section = c.Section.ToString(),
                     RecordId = c.RecordId,
-                    AuthorEmail = c.Author?.Email ?? "Nieznany",
-                    AuthorRole = c.Author?.Role.ToString() ?? "Nieznany",
+                    AuthorEmail = c.Author?.Email ?? c.SubcontractorWorker?.Email ?? "Nieznany",
+                    AuthorRole = c.Author?.Role.ToString() ?? (c.SubcontractorWorker != null ? "SubcontractorForeman" : "Nieznany"),
                     Content = c.Content,
                     IsResolved = c.IsResolved,
-                    CreatedAt = c.CreatedAt
+                    CreatedAt = c.CreatedAt,
+                    Replies = c.Replies.Select(r => new ForemanCommentReply
+                    {
+                        Id = r.Id,
+                        AuthorEmail = r.Author?.Email ?? r.SubcontractorWorker?.Email ?? "Nieznany",
+                        AuthorRole = r.Author?.Role.ToString() ?? (r.SubcontractorWorker != null ? "SubcontractorForeman" : "Nieznany"),
+                        Content = r.Content,
+                        CreatedAt = r.CreatedAt
+                    }).OrderBy(r => r.CreatedAt).ToList()
                 }).ToList(),
             WorkOrders = report.DailyReportWorkOrders.Select(drwo => new ForemanWorkOrderItem
             {
@@ -479,6 +487,16 @@ public class ForemanCommentItem
     public required string AuthorRole { get; set; }
     public required string Content { get; set; }
     public bool IsResolved { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public List<ForemanCommentReply> Replies { get; set; } = [];
+}
+
+public class ForemanCommentReply
+{
+    public Guid Id { get; set; }
+    public required string AuthorEmail { get; set; }
+    public required string AuthorRole { get; set; }
+    public required string Content { get; set; }
     public DateTime CreatedAt { get; set; }
 }
 

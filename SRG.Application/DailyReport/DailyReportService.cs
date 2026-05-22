@@ -306,7 +306,8 @@ public class DailyReportService(
         if (report.Status is not DailyReportStatus.Submitted 
             and not DailyReportStatus.PmReview 
             and not DailyReportStatus.SpmReview
-            and not DailyReportStatus.SubcontractorReview)
+            and not DailyReportStatus.SubcontractorReview
+            and not DailyReportStatus.SubcontractorRejected)  // PM can forward Subco rejection to foreman
         {
             throw new ValidationException("Only Submitted or review-stage DailyReport can be rejected.");
         }
@@ -317,7 +318,12 @@ public class DailyReportService(
         }
 
         var previousStatus = report.Status;
-        report.Status = DailyReportStatus.Rejected;
+        
+        // When Subcontractor rejects from SubcontractorReview → SubcontractorRejected (PM sees)
+        // When PM/SPM rejects (including from SubcontractorRejected) → Rejected (foreman sees)
+        report.Status = previousStatus == DailyReportStatus.SubcontractorReview 
+            ? DailyReportStatus.SubcontractorRejected 
+            : DailyReportStatus.Rejected;
         report.RejectionReason = request.Reason.Trim();
         await RecordStatusChangeAsync(report.Id, previousStatus, report.Status, request.Reason.Trim(), cancellationToken);
         await dailyReportRepository.SaveChangesAsync(cancellationToken);
@@ -420,17 +426,17 @@ public class DailyReportService(
             DailyReportStatus.SpmApproved,
             DailyReportStatus.SubcontractorReview,
             DailyReportStatus.SubcontractorApproved,
-            DailyReportStatus.Rejected
+            DailyReportStatus.Rejected,
+            DailyReportStatus.SubcontractorRejected  // PM sees Subcontractor rejections
         };
         
         var allItems = await dailyReportRepository.GetListItemsByStatusesAsync(statuses, cancellationToken);
         
-        // Filter out rejected reports that were NOT rejected from PM review
+        // Filter out Rejected reports that were rejected by SPM (those go back to foreman, not PM)
         return allItems.Where(r =>
         {
             if (r.Status != DailyReportStatus.Rejected) return true;
-            return r.RejectedFromStatus != DailyReportStatus.SpmReview && 
-                   r.RejectedFromStatus != DailyReportStatus.SubcontractorReview;
+            return r.RejectedFromStatus != DailyReportStatus.SpmReview;
         }).ToList();
     }
 
@@ -609,9 +615,12 @@ public class DailyReportService(
     {
         var report = await GetReportAsync(id, cancellationToken);
 
-        if (report.Status is not DailyReportStatus.Submitted and not DailyReportStatus.PmReview)
+        // PM can approve: Submitted, PmReview, or SubcontractorRejected (re-send to Subco)
+        if (report.Status is not DailyReportStatus.Submitted 
+            and not DailyReportStatus.PmReview 
+            and not DailyReportStatus.SubcontractorRejected)
         {
-            throw new ValidationException("Only Submitted or PmReview DailyReport can be approved by PM.");
+            throw new ValidationException("Only Submitted, PmReview, or SubcontractorRejected DailyReport can be approved by PM.");
         }
 
         EnsureHasEntries(report);
@@ -624,11 +633,19 @@ public class DailyReportService(
         }
 
         var previousStatus = report.Status;
-        // If report is from SubcontractorCrew, send to Subcontractor for review
-        // Otherwise send to SPM for review
-        report.Status = report.SubcontractorCrewId.HasValue 
-            ? DailyReportStatus.SubcontractorReview 
-            : DailyReportStatus.SpmReview;
+        
+        // If SubcontractorRejected, always go back to SubcontractorReview
+        // Otherwise: SubcontractorCrew → SubcontractorReview, regular crew → SpmReview
+        if (previousStatus == DailyReportStatus.SubcontractorRejected)
+        {
+            report.Status = DailyReportStatus.SubcontractorReview;
+        }
+        else
+        {
+            report.Status = report.SubcontractorCrewId.HasValue 
+                ? DailyReportStatus.SubcontractorReview 
+                : DailyReportStatus.SpmReview;
+        }
         report.RejectionReason = null;
         await RecordStatusChangeAsync(report.Id, previousStatus, report.Status, null, cancellationToken);
         await dailyReportRepository.SaveChangesAsync(cancellationToken);

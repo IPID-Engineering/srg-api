@@ -8,9 +8,10 @@ public enum DailyReportStatus
     PmApproved = 3,
     SpmReview = 4,
     SpmApproved = 5,
-    Rejected = 6,
+    Rejected = 6,              // Rejected by PM - foreman sees
     SubcontractorReview = 7,
-    SubcontractorApproved = 8
+    SubcontractorApproved = 8,
+    SubcontractorRejected = 9  // Rejected by Subcontractor - PM sees and decides
 }
 
 public enum DailyReportCommentSection
