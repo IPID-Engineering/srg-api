@@ -110,7 +110,7 @@ public class DailyReportController(IDailyReportService dailyReportService) : Con
     }
 
     [HttpGet("{id:guid}")]
-    [Authorize(Roles = "Foreman,SubcontractorForeman,PM,SPM")]
+    [Authorize(Roles = "Foreman,SubcontractorForeman,PM,SPM,Subcontractor")]
     public async Task<ActionResult<DailyReportResponse>> GetById(Guid id, CancellationToken cancellationToken)
     {
         try
