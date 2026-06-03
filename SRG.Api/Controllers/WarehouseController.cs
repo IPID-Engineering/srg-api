@@ -65,7 +65,7 @@ public class WarehouseController(IWarehouseService warehouseService) : Controlle
     }
 
     [HttpGet("{id:guid}/movements")]
-    [Authorize(Roles = "Logistician,PM,SPM")]
+    [Authorize(Roles = "Logistician,Foreman,SubcontractorForeman,PM,SPM")]
     public async Task<ActionResult<List<StockMovementResponse>>> GetMovements(Guid id, CancellationToken cancellationToken)
     {
         try
