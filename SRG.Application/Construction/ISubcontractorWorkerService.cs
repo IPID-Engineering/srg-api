@@ -7,4 +7,5 @@ public interface ISubcontractorWorkerService
     Task<List<SubcontractorWorkerResponse>> GetMineAsync(Guid subcontractorId, CancellationToken cancellationToken = default);
     Task<List<SubcontractorWorkerResponse>> GetByProjectAsync(Guid projectId, CancellationToken cancellationToken = default);
     Task RemoveAsync(Guid id, Guid subcontractorId, CancellationToken cancellationToken = default);
+    Task<DeleteWorkerImpactResponse> GetDeleteWorkerImpactAsync(Guid id, Guid subcontractorId, CancellationToken cancellationToken = default);
 }

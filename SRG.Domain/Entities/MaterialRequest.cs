@@ -24,4 +24,5 @@ public class MaterialRequest
     
     public WorkOrder? WorkOrder { get; set; }
     public Material? Material { get; set; }
+    public SubcontractorWorker? CreatedByWorker { get; set; }
 }

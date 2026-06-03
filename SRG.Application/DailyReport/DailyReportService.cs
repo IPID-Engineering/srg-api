@@ -165,7 +165,7 @@ public class DailyReportService(
     {
         var report = await GetEditableReportAsync(id, cancellationToken);
 
-        if (request.Hours <= 0)
+        if (!request.IsAbsent && request.Hours <= 0)
         {
             throw new ValidationException("Hours must be greater than zero.");
         }
@@ -177,7 +177,8 @@ public class DailyReportService(
             DailyReportId = report.Id,
             WorkerId = request.WorkerId,
             SubcontractorWorkerId = request.SubcontractorWorkerId,
-            Hours = request.Hours,
+            Hours = request.IsAbsent ? 0 : request.Hours,
+            IsAbsent = request.IsAbsent,
         }, cancellationToken);
         await dailyReportRepository.SaveChangesAsync(cancellationToken);
 
@@ -818,7 +819,8 @@ public class DailyReportService(
                 entry.WorkerId,
                 entry.SubcontractorWorkerId,
                 GetWorkerName(entry),
-                entry.Hours)).ToList(),
+                entry.Hours,
+                entry.IsAbsent)).ToList(),
             report.WorkEntries.Select(entry => new WorkEntryResponse(
                 entry.Id,
                 entry.DailyReportId,
@@ -849,8 +851,8 @@ public class DailyReportService(
                 h.FromStatus,
                 h.ToStatus,
                 h.Reason,
-                h.ChangedById,
-                h.ChangedBy?.Email,
+                h.ChangedById ?? h.ChangedByWorkerId,
+                h.ChangedBy?.Email ?? h.ChangedByEmail,
                 h.ChangedAt)).ToList(),
             report.ChangeHistory.OrderByDescending(h => h.ChangedAt).Select(h => new DailyReportChangeHistoryResponse(
                 h.Id,
@@ -1070,7 +1072,8 @@ public class DailyReportService(
             FromStatus = fromStatus,
             ToStatus = toStatus,
             Reason = reason,
-            ChangedById = currentUserContext.UserId ?? Guid.Empty,
+            ChangedById = currentUserContext.UserId,
+            ChangedByEmail = currentUserContext.Email,
             ChangedAt = DateTime.UtcNow,
         };
         await dailyReportRepository.AddStatusHistoryAsync(history, cancellationToken);

@@ -142,6 +142,24 @@ public class SubcontractorCrewsController(ISubcontractorCrewService crewService,
         }
     }
 
+    [HttpGet("{id:guid}/delete-impact")]
+    [Authorize(Roles = "Subcontractor")]
+    public async Task<ActionResult<DeleteCrewImpactResponse>> GetDeleteImpact(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await crewService.GetDeleteCrewImpactAsync(id, User.GetUserId(), cancellationToken));
+        }
+        catch (ValidationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new { message = exception.Message });
+        }
+    }
+
     [HttpDelete("{id:guid}")]
     [Authorize(Roles = "Subcontractor")]
     public async Task<IActionResult> Remove(Guid id, CancellationToken cancellationToken)

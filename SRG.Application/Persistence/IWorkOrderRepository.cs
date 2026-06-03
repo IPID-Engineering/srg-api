@@ -17,11 +17,21 @@ public interface IWorkOrderRepository
     Task<WorkOrder?> GetWorkOrderByNumberAsync(string number, CancellationToken cancellationToken = default);
     Task<int> GetNextWorkOrderSequenceAsync(CancellationToken cancellationToken = default);
     Task AddWorkOrderAsync(WorkOrder workOrder, CancellationToken cancellationToken = default);
+    void RemoveWorkOrder(WorkOrder workOrder);
     Task AddOrderedWorkAsync(OrderedWork orderedWork, CancellationToken cancellationToken = default);
     Task AddOrderedMaterialAsync(OrderedMaterial orderedMaterial, CancellationToken cancellationToken = default);
     void RemoveOrderedWork(OrderedWork orderedWork);
     void RemoveOrderedMaterial(OrderedMaterial orderedMaterial);
     Task<OrderedWork?> GetOrderedWorkByIdAsync(Guid id, CancellationToken cancellationToken = default);
     Task<OrderedMaterial?> GetOrderedMaterialByIdAsync(Guid id, CancellationToken cancellationToken = default);
+    Task ClearSubcontractorCrewFromWorkOrdersAsync(Guid subcontractorCrewId, CancellationToken cancellationToken = default);
+    Task<int> CountWorkOrdersBySubcontractorCrewAsync(Guid subcontractorCrewId, CancellationToken cancellationToken = default);
+    Task ClearWorkOrderFromDailyReportsAsync(Guid workOrderId, CancellationToken cancellationToken = default);
+    Task<int> CountDailyReportsByWorkOrderAsync(Guid workOrderId, CancellationToken cancellationToken = default);
+    Task<int> CountIssuesByWorkOrderAsync(Guid workOrderId, CancellationToken cancellationToken = default);
+    Task<bool> HasConfirmedIssuesForWorkOrderAsync(Guid workOrderId, CancellationToken cancellationToken = default);
+    Task<int> CountMaterialRequestsByWorkOrderAsync(Guid workOrderId, CancellationToken cancellationToken = default);
+    Task RemoveMaterialRequestsByWorkOrderAsync(Guid workOrderId, CancellationToken cancellationToken = default);
+    Task RemoveIssuesByWorkOrderAsync(Guid workOrderId, CancellationToken cancellationToken = default);
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

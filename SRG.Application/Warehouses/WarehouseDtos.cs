@@ -63,6 +63,10 @@ public record CreateIssueRequest(Guid WorkOrderId);
 
 public record AddIssueItemRequest(Guid MaterialId, decimal Quantity);
 
+public record ConfirmIssueRequest(
+    Guid? ReceivedByWorkerId = null,
+    Guid? ReceivedBySubcontractorWorkerId = null);
+
 public record IssueResponse(
     Guid Id,
     string Number,
@@ -72,11 +76,28 @@ public record IssueResponse(
     Guid ToWarehouseId,
     string? ToWarehouseName,
     Guid CreatedById,
+    string? CreatedByName,
     DateTime CreatedAt,
+    DateTime? ConfirmedAt,
     IssueStatus Status,
+    string? ReceivedByName,
+    string? VerificationCode,
     List<IssueItemResponse> Items);
 
 public record IssueItemResponse(Guid Id, Guid IssueId, Guid MaterialId, string? MaterialName, string? Unit, decimal Quantity);
+
+public record IssueWorkerOption(Guid Id, string FullName, bool IsSubcontractor);
+
+public record IssueVerificationResponse(
+    bool IsValid,
+    string? IssueNumber,
+    string? ProjectName,
+    string? CrewName,
+    string? IssuedByName,
+    string? ReceivedByName,
+    DateTime? ConfirmedAt,
+    int ItemCount,
+    string? Message);
 
 public record CreateReturnRequest;
 
@@ -157,3 +178,33 @@ public record StockMovementResponse(
     Guid CreatedById,
     string? CreatedByName,
     DateTime CreatedAt);
+
+public record CheckMaterialAvailabilityRequest(
+    decimal Quantity,
+    Guid? ExcludeWorkOrderId = null,
+    int DaysAhead = 14);
+
+public record MaterialConflictInfo(
+    Guid WorkOrderId,
+    string WorkOrderNumber,
+    string? ProjectName,
+    string? CrewName,
+    DateOnly? PlannedEndDate,
+    decimal PlannedQuantity,
+    decimal IssuedQuantity,
+    decimal RemainingNeeded,
+    decimal ShortageIfProceeded);
+
+public record MaterialAvailabilityResponse(
+    Guid MaterialId,
+    string MaterialName,
+    string Unit,
+    decimal CurrentStock,
+    decimal ReservedQuantity,
+    decimal AvailableStock,
+    decimal RequestedQuantity,
+    decimal TotalPlannedInOtherOrders,
+    decimal AfterAllocationAvailable,
+    bool HasConflict,
+    string? ConflictSeverity,
+    List<MaterialConflictInfo> Conflicts);

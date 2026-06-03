@@ -9,4 +9,10 @@ public interface IAuthService
     Task<UserResponse> UpdateUserAsync(Guid userId, UpdateUserRequest request, CancellationToken cancellationToken = default);
     Task<UserResponse> DeactivateUserAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<UserResponse> ActivateUserAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<UserResponse> BanUserAsync(Guid userId, BanUserRequest request, CancellationToken cancellationToken = default);
+    Task<UserResponse> UnbanUserAsync(Guid userId, CancellationToken cancellationToken = default);
+    
+    // One-time login token
+    Task<OneTimeTokenResponse> GenerateOneTimeLoginTokenAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<AuthResponse> LoginWithOneTimeTokenAsync(string token, CancellationToken cancellationToken = default);
 }

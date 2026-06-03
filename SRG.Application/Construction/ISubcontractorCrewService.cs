@@ -8,6 +8,7 @@ public interface ISubcontractorCrewService
     Task<SubcontractorCrewResponse> UpdateAsync(Guid id, UpdateSubcontractorCrewRequest request, Guid subcontractorId, CancellationToken cancellationToken = default);
     Task SetForemanAsync(Guid crewId, SetForemanRequest request, Guid subcontractorId, CancellationToken cancellationToken = default);
     Task RemoveAsync(Guid id, Guid subcontractorId, CancellationToken cancellationToken = default);
+    Task<DeleteCrewImpactResponse> GetDeleteCrewImpactAsync(Guid id, Guid subcontractorId, CancellationToken cancellationToken = default);
     Task AssignWorkerToCrewAsync(Guid crewId, Guid workerId, Guid subcontractorId, CancellationToken cancellationToken = default);
     Task RemoveWorkerFromCrewAsync(Guid crewId, Guid workerId, Guid subcontractorId, CancellationToken cancellationToken = default);
     

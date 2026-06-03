@@ -49,6 +49,7 @@ public class AppDbContext(
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<MaterialRequest> MaterialRequests => Set<MaterialRequest>();
     public DbSet<InewiRecord> InewiRecords => Set<InewiRecord>();
+    public DbSet<InewiIntegrationSettings> InewiIntegrationSettings => Set<InewiIntegrationSettings>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

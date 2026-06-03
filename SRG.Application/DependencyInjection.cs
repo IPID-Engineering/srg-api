@@ -3,6 +3,7 @@ using SRG.Application.Analytics;
 using SRG.Application.Auth;
 using SRG.Application.Construction;
 using SRG.Application.DailyReports;
+using SRG.Application.Email;
 using SRG.Application.Inewi;
 using SRG.Application.MaterialRequests;
 using SRG.Application.Warehouses;
@@ -15,6 +16,8 @@ public static class DependencyInjection
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
     {
         services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<IMicrosoftAuthService, MicrosoftAuthService>();
+        services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IForemanAuthService, ForemanAuthService>();
         services.AddScoped<IPasswordService, PasswordService>();
         services.AddScoped<IJwtTokenService, JwtTokenService>();
@@ -41,6 +44,7 @@ public static class DependencyInjection
         services.AddScoped<ICrewStatsService, CrewStatsService>();
         services.AddScoped<IMaterialRequestService, MaterialRequestService>();
         services.AddScoped<IInewiService, InewiService>();
+        services.AddScoped<IInewiIntegrationService, InewiIntegrationService>();
 
         return services;
     }

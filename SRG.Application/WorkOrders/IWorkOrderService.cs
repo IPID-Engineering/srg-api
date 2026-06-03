@@ -6,6 +6,8 @@ public interface IWorkOrderService
     Task<WorkOrderResponse> GetWorkOrderAsync(Guid id, CancellationToken cancellationToken = default);
     Task<WorkOrderResponse> CreateWorkOrderAsync(CreateWorkOrderRequest request, Guid createdById, CancellationToken cancellationToken = default);
     Task<WorkOrderResponse> UpdateWorkOrderAsync(Guid id, UpdateWorkOrderRequest request, CancellationToken cancellationToken = default);
+    Task DeleteWorkOrderAsync(Guid id, Guid userId, CancellationToken cancellationToken = default);
+    Task<DeleteWorkOrderImpactResponse> GetDeleteWorkOrderImpactAsync(Guid id, CancellationToken cancellationToken = default);
     Task<WorkOrderResponse> AddOrderedWorkAsync(Guid id, AddOrderedWorkRequest request, Guid userId, CancellationToken cancellationToken = default);
     Task<WorkOrderResponse> AddOrderedMaterialAsync(Guid id, AddOrderedMaterialRequest request, Guid userId, string userRole, CancellationToken cancellationToken = default);
     Task RemoveOrderedWorkAsync(Guid workOrderId, Guid orderedWorkId, Guid userId, CancellationToken cancellationToken = default);

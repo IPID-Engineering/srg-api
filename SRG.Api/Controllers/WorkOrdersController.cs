@@ -48,6 +48,39 @@ public class WorkOrdersController(IWorkOrderService workOrderService) : Controll
         return await WriteAction(() => workOrderService.UpdateWorkOrderAsync(id, request, cancellationToken));
     }
 
+    [HttpGet("{id:guid}/delete-impact")]
+    [Authorize(Roles = "PM,SPM")]
+    public async Task<ActionResult<DeleteWorkOrderImpactResponse>> GetDeleteImpact(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await workOrderService.GetDeleteWorkOrderImpactAsync(id, cancellationToken));
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new { message = exception.Message });
+        }
+    }
+
+    [HttpDelete("{id:guid}")]
+    [Authorize(Roles = "PM,SPM")]
+    public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await workOrderService.DeleteWorkOrderAsync(id, User.GetUserId(), cancellationToken);
+            return NoContent();
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new { message = exception.Message });
+        }
+        catch (ValidationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
+
     [HttpPost("{id:guid}/ordered-works")]
     [Authorize(Roles = "PM,SPM")]
     public async Task<ActionResult<WorkOrderResponse>> AddOrderedWork(

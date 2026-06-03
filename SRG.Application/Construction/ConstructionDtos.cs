@@ -60,6 +60,10 @@ public record SubcontractorWorkerResponse(
     /// </summary>
     string? DefaultPassword,
     bool IsForeman,
+    /// <summary>
+    /// ID pracownika w systemie inewi - jeśli przypisany
+    /// </summary>
+    string? InewiEmployeeId,
     DateTime CreatedAt);
 
 public record AssignSubcontractorRequest(Guid SubcontractorId);
@@ -148,3 +152,17 @@ public record SubcontractorCrewWithPmAccessResponse(
     DateTime CreatedAt);
 
 public record GrantPmAccessRequest(Guid PmUserId);
+
+// Deletion impact responses
+public record DeleteCrewImpactResponse(
+    Guid Id,
+    string Name,
+    int WorkerCount,
+    int DailyReportCount,
+    int WorkOrderCount);
+
+public record DeleteWorkerImpactResponse(
+    Guid Id,
+    string FirstName,
+    string LastName,
+    int WorkHoursCount);

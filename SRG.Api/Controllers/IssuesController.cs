@@ -44,11 +44,51 @@ public class IssuesController(IIssueService issueService) : ControllerBase
         return await Handle(() => issueService.AddItemAsync(id, request, cancellationToken));
     }
 
+    [HttpGet("{id:guid}/workers")]
+    [Authorize(Roles = "Logistician")]
+    public async Task<ActionResult<List<IssueWorkerOption>>> GetWorkers(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await issueService.GetWorkersForIssueAsync(id, cancellationToken));
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new { message = exception.Message });
+        }
+    }
+
     [HttpPost("{id:guid}/confirm")]
     [Authorize(Roles = "Logistician")]
-    public async Task<ActionResult<IssueResponse>> Confirm(Guid id, CancellationToken cancellationToken)
+    public async Task<ActionResult<IssueResponse>> Confirm(Guid id, ConfirmIssueRequest request, CancellationToken cancellationToken)
     {
-        return await Handle(() => issueService.ConfirmIssueAsync(id, cancellationToken));
+        return await Handle(() => issueService.ConfirmIssueAsync(id, request, cancellationToken));
+    }
+
+    [HttpGet("{id:guid}/protocol")]
+    [Authorize(Roles = "Logistician")]
+    public async Task<IActionResult> GetProtocol(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var docBytes = await issueService.GenerateProtocolAsync(id, cancellationToken);
+            return File(docBytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", $"protokol-wydania-{id:N}.docx");
+        }
+        catch (ValidationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new { message = exception.Message });
+        }
+    }
+
+    [HttpGet("{id:guid}/verify")]
+    [AllowAnonymous]
+    public async Task<ActionResult<IssueVerificationResponse>> Verify(Guid id, [FromQuery] string code, CancellationToken cancellationToken)
+    {
+        return Ok(await issueService.VerifyIssueAsync(id, code, cancellationToken));
     }
 
     private static async Task<ActionResult<IssueResponse>> Handle(Func<Task<IssueResponse>> action)

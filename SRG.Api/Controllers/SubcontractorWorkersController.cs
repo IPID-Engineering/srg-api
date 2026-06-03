@@ -52,6 +52,23 @@ public class SubcontractorWorkersController(ISubcontractorWorkerService subcontr
         }
     }
 
+    [HttpGet("{id:guid}/delete-impact")]
+    public async Task<ActionResult<DeleteWorkerImpactResponse>> GetDeleteImpact(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await subcontractorWorkerService.GetDeleteWorkerImpactAsync(id, User.GetUserId(), cancellationToken));
+        }
+        catch (ValidationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new { message = exception.Message });
+        }
+    }
+
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Remove(Guid id, CancellationToken cancellationToken)
     {

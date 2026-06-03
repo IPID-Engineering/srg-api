@@ -180,3 +180,9 @@
 /Users/janrzepisko/ipid/srg/api/SRG.Api/bin/Debug/net8.0/Microsoft.Extensions.Hosting.Abstractions.dll
 /Users/janrzepisko/ipid/srg/api/SRG.Api/bin/Debug/net8.0/System.Diagnostics.DiagnosticSource.dll
 /Users/janrzepisko/ipid/srg/api/SRG.Api/obj/Debug/net8.0/SRG.Api.sourcelink.json
+/Users/janrzepisko/ipid/srg/api/SRG.Api/bin/Debug/net8.0/BouncyCastle.Cryptography.dll
+/Users/janrzepisko/ipid/srg/api/SRG.Api/bin/Debug/net8.0/MailKit.dll
+/Users/janrzepisko/ipid/srg/api/SRG.Api/bin/Debug/net8.0/MimeKit.dll
+/Users/janrzepisko/ipid/srg/api/SRG.Api/bin/Debug/net8.0/System.Security.Cryptography.Pkcs.dll
+/Users/janrzepisko/ipid/srg/api/SRG.Api/bin/Debug/net8.0/runtimes/win/lib/net8.0/System.Security.Cryptography.Pkcs.dll
+/Users/janrzepisko/ipid/srg/api/SRG.Api/bin/Debug/net8.0/QRCoder.dll

@@ -8,7 +8,6 @@ public interface IForemanWorkerService
 {
     Task<List<ForemanWorkerResponse>> GetMyWorkersAsync(Guid foremanWorkerId, CancellationToken cancellationToken = default);
     Task<ForemanWorkerResponse> AddWorkerAsync(AddForemanWorkerRequest request, Guid foremanWorkerId, CancellationToken cancellationToken = default);
-    Task RemoveWorkerAsync(Guid workerId, Guid foremanWorkerId, CancellationToken cancellationToken = default);
     Task<ForemanWorkerStatsResponse> GetWorkerStatsAsync(Guid workerId, Guid foremanWorkerId, CancellationToken cancellationToken = default);
 }
 
@@ -96,41 +95,6 @@ public class ForemanWorkerService(
         await construction.SaveChangesAsync(cancellationToken);
 
         return ToResponse(worker);
-    }
-
-    public async Task RemoveWorkerAsync(Guid workerId, Guid foremanWorkerId, CancellationToken cancellationToken = default)
-    {
-        var foreman = await construction.GetSubcontractorWorkerByIdAsync(foremanWorkerId, cancellationToken)
-            ?? throw new KeyNotFoundException("Nie znaleziono brygadzisty.");
-
-        if (foreman.CrewId is null)
-        {
-            throw new KeyNotFoundException("Brygadzista nie ma przypisanej brygady.");
-        }
-
-        var crew = await construction.GetSubcontractorCrewByIdAsync(foreman.CrewId.Value, cancellationToken)
-            ?? throw new KeyNotFoundException("Nie znaleziono brygady.");
-
-        if (crew.CurrentForemanId != foremanWorkerId)
-        {
-            throw new ValidationException("Nie jesteś aktualnym brygadzistą tej brygady.");
-        }
-
-        var worker = await construction.GetSubcontractorWorkerByIdAsync(workerId, cancellationToken)
-            ?? throw new KeyNotFoundException("Nie znaleziono pracownika.");
-
-        if (worker.CrewId != crew.Id)
-        {
-            throw new ValidationException("Ten pracownik nie należy do Twojej brygady.");
-        }
-
-        if (worker.Id == foremanWorkerId)
-        {
-            throw new ValidationException("Nie możesz usunąć samego siebie.");
-        }
-
-        construction.RemoveSubcontractorWorker(worker);
-        await construction.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<ForemanWorkerStatsResponse> GetWorkerStatsAsync(Guid workerId, Guid foremanWorkerId, CancellationToken cancellationToken = default)

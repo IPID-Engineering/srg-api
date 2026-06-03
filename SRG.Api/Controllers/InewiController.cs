@@ -4,32 +4,28 @@ using Microsoft.AspNetCore.Mvc;
 using SRG.Api.Extensions;
 using SRG.Application.Inewi;
 using SRG.Application.Persistence;
+using SRG.Infrastructure.Inewi;
 
 namespace SRG.Api.Controllers;
 
 [ApiController]
 [Route("inewi")]
-[Authorize(Roles = "Subcontractor,SPM,PM,Admin")]
+[Authorize(Roles = "Subcontractor")]
 public class InewiController(
-    IInewiService inewiService, 
+    IInewiService inewiService,
+    IInewiIntegrationService integrationService,
     IConstructionRepository constructionRepository) : ControllerBase
 {
-    [HttpGet("crew/{subcontractorCrewId:guid}")]
-    public async Task<ActionResult<List<InewiRecordResponse>>> GetBySubcontractorCrew(
-        Guid subcontractorCrewId,
-        CancellationToken cancellationToken)
+    /// <summary>
+    /// Get all INEWI records for the current subcontractor.
+    /// </summary>
+    [HttpGet("records")]
+    public async Task<ActionResult<List<InewiRecordResponse>>> GetRecords(CancellationToken cancellationToken)
     {
         try
         {
-            if (!await CanAccessCrewAsync(subcontractorCrewId, cancellationToken))
-            {
-                return Forbid();
-            }
-            return Ok(await inewiService.GetBySubcontractorCrewAsync(subcontractorCrewId, cancellationToken));
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
+            var subcontractorId = User.GetUserId();
+            return Ok(await inewiService.GetBySubcontractorAsync(subcontractorId, cancellationToken));
         }
         catch (Exception)
         {
@@ -37,30 +33,24 @@ public class InewiController(
         }
     }
 
-    [HttpGet("crew/{subcontractorCrewId:guid}/range")]
+    /// <summary>
+    /// Get INEWI records for a date range.
+    /// </summary>
+    [HttpGet("records/range")]
     public async Task<ActionResult<List<InewiRecordResponse>>> GetByDateRange(
-        Guid subcontractorCrewId,
         [FromQuery] DateOnly from,
         [FromQuery] DateOnly to,
         CancellationToken cancellationToken)
     {
         try
         {
-            if (!await CanAccessCrewAsync(subcontractorCrewId, cancellationToken))
-            {
-                return Forbid();
-            }
-            
             if (from > to)
             {
                 return BadRequest(new { message = "Data początkowa nie może być późniejsza niż data końcowa." });
             }
             
-            return Ok(await inewiService.GetByDateRangeAsync(subcontractorCrewId, from, to, cancellationToken));
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(new { message = ex.Message });
+            var subcontractorId = User.GetUserId();
+            return Ok(await inewiService.GetByDateRangeAsync(subcontractorId, from, to, cancellationToken));
         }
         catch (Exception)
         {
@@ -68,19 +58,16 @@ public class InewiController(
         }
     }
 
-    [HttpPost("crew/{subcontractorCrewId:guid}/import")]
+    /// <summary>
+    /// Import INEWI records manually.
+    /// </summary>
+    [HttpPost("records/import")]
     public async Task<ActionResult<ImportInewiResult>> Import(
-        Guid subcontractorCrewId,
         [FromBody] ImportInewiRequest request,
         CancellationToken cancellationToken)
     {
         try
         {
-            if (!await CanAccessCrewAsync(subcontractorCrewId, cancellationToken))
-            {
-                return Forbid();
-            }
-            
             if (request.Records == null || request.Records.Count == 0)
             {
                 return BadRequest(new { message = "Brak rekordów do importu." });
@@ -91,8 +78,8 @@ public class InewiController(
                 return BadRequest(new { message = "Maksymalnie 10000 rekordów w jednym imporcie." });
             }
             
-            var userId = User.GetUserId();
-            var result = await inewiService.ImportAsync(subcontractorCrewId, userId, request.Records, request.SourceFileName, cancellationToken);
+            var subcontractorId = User.GetUserId();
+            var result = await inewiService.ImportAsync(subcontractorId, subcontractorId, request.Records, request.SourceFileName, cancellationToken);
             return Ok(result);
         }
         catch (ValidationException ex)
@@ -104,37 +91,161 @@ public class InewiController(
             return StatusCode(500, new { message = "Nie udało się zaimportować rekordów INEWI." });
         }
     }
-    
-    private async Task<bool> CanAccessCrewAsync(Guid crewId, CancellationToken cancellationToken)
+
+    /// <summary>
+    /// Get integration status for the current subcontractor.
+    /// </summary>
+    [HttpGet("integration")]
+    public async Task<ActionResult<InewiIntegrationStatusResponse>> GetIntegrationStatus(CancellationToken cancellationToken)
     {
-        var role = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
-        var userId = User.GetUserId();
-        
-        // Admin i SPM mają dostęp do wszystkich brygad
-        if (role == "Admin" || role == "SPM")
+        try
         {
-            return true;
+            var subcontractorId = User.GetUserId();
+            return Ok(await integrationService.GetIntegrationStatusAsync(subcontractorId, cancellationToken));
         }
-        
-        var crew = await constructionRepository.GetSubcontractorCrewByIdAsync(crewId, cancellationToken);
-        if (crew == null)
+        catch (Exception)
         {
-            return false;
+            return StatusCode(500, new { message = "Nie udało się pobrać statusu integracji." });
         }
-        
-        // Subcontractor może tylko do swoich brygad
-        if (role == "Subcontractor")
+    }
+
+    /// <summary>
+    /// Configure integration with inewi API.
+    /// </summary>
+    [HttpPost("integration")]
+    public async Task<ActionResult<InewiIntegrationStatusResponse>> ConfigureIntegration(
+        [FromBody] ConfigureInewiIntegrationRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
         {
-            return crew.SubcontractorId == userId;
+            var subcontractorId = User.GetUserId();
+            return Ok(await integrationService.ConfigureIntegrationAsync(subcontractorId, subcontractorId, request, cancellationToken));
         }
-        
-        // PM może tylko do brygad, do których ma dostęp
-        if (role == "PM")
+        catch (ValidationException ex)
         {
-            var hasAccess = await constructionRepository.GetSubcontractorCrewPmAccessAsync(crewId, userId, cancellationToken);
-            return hasAccess != null;
+            return BadRequest(new { message = ex.Message });
         }
-        
-        return false;
+        catch (InewiApiException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, new { message = "Nie udało się skonfigurować integracji." });
+        }
+    }
+
+    /// <summary>
+    /// Sync data from inewi API.
+    /// </summary>
+    [HttpPost("integration/sync")]
+    public async Task<ActionResult<InewiSyncResult>> SyncData(
+        [FromBody] InewiSyncRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            if (request.From > request.To)
+            {
+                return BadRequest(new { message = "Data początkowa nie może być późniejsza niż data końcowa." });
+            }
+            
+            var subcontractorId = User.GetUserId();
+            return Ok(await integrationService.SyncDataAsync(subcontractorId, subcontractorId, request, cancellationToken));
+        }
+        catch (ValidationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InewiApiException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, new { message = "Nie udało się zsynchronizować danych." });
+        }
+    }
+
+    /// <summary>
+    /// Disable integration with inewi API.
+    /// </summary>
+    [HttpDelete("integration")]
+    public async Task<ActionResult> DisableIntegration(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subcontractorId = User.GetUserId();
+            await integrationService.DisableIntegrationAsync(subcontractorId, cancellationToken);
+            return Ok(new { message = "Integracja została wyłączona." });
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, new { message = "Nie udało się wyłączyć integracji." });
+        }
+    }
+
+    /// <summary>
+    /// Get list of employees from inewi organization for mapping.
+    /// </summary>
+    [HttpGet("integration/employees")]
+    public async Task<ActionResult<InewiEmployeesListResponse>> GetInewiEmployees(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subcontractorId = User.GetUserId();
+            return Ok(await integrationService.GetInewiEmployeesAsync(subcontractorId, cancellationToken));
+        }
+        catch (ValidationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InewiApiException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, new { message = "Nie udało się pobrać listy pracowników z inewi." });
+        }
+    }
+
+    /// <summary>
+    /// Map a worker to an inewi employee.
+    /// </summary>
+    [HttpPut("workers/{workerId:guid}/mapping")]
+    public async Task<ActionResult> MapWorkerToInewiEmployee(
+        Guid workerId,
+        [FromBody] MapWorkerToInewiRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var subcontractorId = User.GetUserId();
+            
+            var worker = await constructionRepository.GetSubcontractorWorkerByIdAsync(workerId, cancellationToken);
+            if (worker == null)
+            {
+                return NotFound(new { message = "Nie znaleziono pracownika." });
+            }
+            
+            // Verify the worker belongs to the current subcontractor
+            if (worker.SubcontractorId != subcontractorId)
+            {
+                return Forbid();
+            }
+            
+            await integrationService.MapWorkerToInewiEmployeeAsync(workerId, request.InewiEmployeeId, cancellationToken);
+            return Ok(new { message = "Mapowanie zostało zapisane." });
+        }
+        catch (ValidationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception)
+        {
+            return StatusCode(500, new { message = "Nie udało się zapisać mapowania." });
+        }
     }
 }

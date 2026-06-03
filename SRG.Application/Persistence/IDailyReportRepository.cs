@@ -21,6 +21,12 @@ public interface IDailyReportRepository
     /// </summary>
     Task<List<DailyReportListItemResponse>> GetListItemsByStatusesAsync(IEnumerable<DailyReportStatus> statuses, CancellationToken cancellationToken = default);
     
+    /// <summary>
+    /// Returns lightweight calendar items using SQL projection.
+    /// Much faster than GetByCrewDateRangeAsync for calendar views.
+    /// </summary>
+    Task<List<ForemanDkpCalendarItem>> GetCalendarItemsAsync(Guid crewId, DateOnly startDate, DateOnly endDate, CancellationToken cancellationToken = default);
+    
     Task<bool> ExistsForCrewDateAsync(Guid crewId, DateOnly date, CancellationToken cancellationToken = default);
     Task<Domain.Entities.DailyReport?> GetBySubcontractorCrewAndDateAsync(Guid subcontractorCrewId, DateOnly date, CancellationToken cancellationToken = default);
     Task AddAsync(Domain.Entities.DailyReport dailyReport, CancellationToken cancellationToken = default);
@@ -32,5 +38,14 @@ public interface IDailyReportRepository
     Task AddChangeHistoryAsync(DailyReportChangeHistory history, CancellationToken cancellationToken = default);
     Task AddDailyReportWorkOrderAsync(DailyReportWorkOrder entry, CancellationToken cancellationToken = default);
     Task RemoveDailyReportWorkOrderAsync(DailyReportWorkOrder entry, CancellationToken cancellationToken = default);
+    
+    // Delete operations
+    Task<List<Domain.Entities.DailyReport>> GetBySubcontractorCrewAsync(Guid subcontractorCrewId, CancellationToken cancellationToken = default);
+    void RemoveDailyReport(Domain.Entities.DailyReport dailyReport);
+    void RemoveDailyReports(IEnumerable<Domain.Entities.DailyReport> dailyReports);
+    Task RemoveWorkHoursBySubcontractorWorkerAsync(Guid subcontractorWorkerId, CancellationToken cancellationToken = default);
+    Task<int> CountDailyReportsBySubcontractorCrewAsync(Guid subcontractorCrewId, CancellationToken cancellationToken = default);
+    Task<int> CountWorkHoursBySubcontractorWorkerAsync(Guid subcontractorWorkerId, CancellationToken cancellationToken = default);
+    
     Task SaveChangesAsync(CancellationToken cancellationToken = default);
 }

@@ -17,7 +17,9 @@ public class DailyReportStatusHistoryConfiguration : IEntityTypeConfiguration<Da
         builder.Property(h => h.FromStatus).HasColumnName("from_status").IsRequired();
         builder.Property(h => h.ToStatus).HasColumnName("to_status").IsRequired();
         builder.Property(h => h.Reason).HasColumnName("reason");
-        builder.Property(h => h.ChangedById).HasColumnName("changed_by_id").IsRequired();
+        builder.Property(h => h.ChangedById).HasColumnName("changed_by_id");
+        builder.Property(h => h.ChangedByWorkerId).HasColumnName("changed_by_worker_id");
+        builder.Property(h => h.ChangedByEmail).HasColumnName("changed_by_email").HasMaxLength(255);
         builder.Property(h => h.ChangedAt).HasColumnName("changed_at").IsRequired();
 
         builder.HasOne(h => h.DailyReport)
@@ -28,6 +30,11 @@ public class DailyReportStatusHistoryConfiguration : IEntityTypeConfiguration<Da
         builder.HasOne(h => h.ChangedBy)
             .WithMany()
             .HasForeignKey(h => h.ChangedById)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.SetNull);
+        
+        builder.HasOne(h => h.ChangedByWorker)
+            .WithMany()
+            .HasForeignKey(h => h.ChangedByWorkerId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

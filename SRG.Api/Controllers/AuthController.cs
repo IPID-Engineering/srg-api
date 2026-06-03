@@ -7,7 +7,7 @@ namespace SRG.Api.Controllers;
 
 [ApiController]
 [Route("auth")]
-public class AuthController(IAuthService authService) : ControllerBase
+public class AuthController(IAuthService authService, IMicrosoftAuthService microsoftAuthService) : ControllerBase
 {
     [HttpPost("login")]
     [AllowAnonymous]
@@ -78,7 +78,7 @@ public class AuthController(IAuthService authService) : ControllerBase
         try
         {
             var allUsers = await authService.GetAllUsersAsync(cancellationToken);
-            var pmUsers = allUsers.Where(u => u.Role == SRG.Domain.Enums.UserRole.PM || u.Role == SRG.Domain.Enums.UserRole.SPM).ToList();
+            var pmUsers = allUsers.Where(u => u.Role == SRG.Domain.Enums.UserRole.PM).ToList();
             return Ok(pmUsers);
         }
         catch (Exception)
@@ -135,4 +135,175 @@ public class AuthController(IAuthService authService) : ControllerBase
             return NotFound(new { message = exception.Message });
         }
     }
+
+    [HttpPost("users/{id:guid}/ban")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<UserResponse>> BanUser(
+        Guid id, 
+        [FromBody] BanUserRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await authService.BanUserAsync(id, request, cancellationToken));
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new { message = exception.Message });
+        }
+        catch (ValidationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
+
+    [HttpPost("users/{id:guid}/unban")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<UserResponse>> UnbanUser(Guid id, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await authService.UnbanUserAsync(id, cancellationToken));
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new { message = exception.Message });
+        }
+    }
+
+    // Microsoft SSO endpoints
+
+    [HttpPost("microsoft/generate-token/{userId:guid}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<ActivationTokenResponse>> GenerateMicrosoftActivationToken(
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await microsoftAuthService.GenerateActivationTokenAsync(userId, cancellationToken));
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new { message = exception.Message });
+        }
+        catch (ValidationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
+
+    [HttpPost("microsoft/reset-token/{userId:guid}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<ActivationTokenResponse>> ResetMicrosoftActivationToken(
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await microsoftAuthService.ResetActivationTokenAsync(userId, cancellationToken));
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new { message = exception.Message });
+        }
+        catch (ValidationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
+
+    [HttpPost("microsoft/validate-token")]
+    [AllowAnonymous]
+    public async Task<ActionResult<UserResponse>> ValidateActivationToken(
+        [FromBody] ValidateTokenRequest request,
+        CancellationToken cancellationToken)
+    {
+        var user = await microsoftAuthService.GetUserByActivationTokenAsync(request.Token, cancellationToken);
+        if (user is null)
+        {
+            return NotFound(new { message = "Invalid or expired activation token." });
+        }
+        return Ok(user);
+    }
+
+    [HttpPost("microsoft/activate")]
+    [AllowAnonymous]
+    public async Task<ActionResult<AuthResponse>> ActivateWithMicrosoft(
+        ActivateWithMicrosoftRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await microsoftAuthService.ActivateWithMicrosoftAsync(request, cancellationToken));
+        }
+        catch (ValidationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            return Unauthorized(new { message = exception.Message });
+        }
+    }
+
+    [HttpPost("microsoft/login")]
+    [AllowAnonymous]
+    public async Task<ActionResult<AuthResponse>> LoginWithMicrosoft(
+        MicrosoftLoginRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await microsoftAuthService.LoginWithMicrosoftAsync(request, cancellationToken));
+        }
+        catch (ValidationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            return Unauthorized(new { message = exception.Message });
+        }
+    }
+
+    // One-time login token endpoints
+
+    [HttpPost("one-time-token/{userId:guid}")]
+    [Authorize(Roles = "Admin")]
+    public async Task<ActionResult<OneTimeTokenResponse>> GenerateOneTimeLoginToken(
+        Guid userId,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await authService.GenerateOneTimeLoginTokenAsync(userId, cancellationToken));
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new { message = exception.Message });
+        }
+        catch (ValidationException exception)
+        {
+            return BadRequest(new { message = exception.Message });
+        }
+    }
+
+    [HttpPost("one-time-login")]
+    [AllowAnonymous]
+    public async Task<ActionResult<AuthResponse>> LoginWithOneTimeToken(
+        OneTimeLoginRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await authService.LoginWithOneTimeTokenAsync(request.Token, cancellationToken));
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            return Unauthorized(new { message = exception.Message });
+        }
+    }
 }
+
+public record ValidateTokenRequest(string Token);

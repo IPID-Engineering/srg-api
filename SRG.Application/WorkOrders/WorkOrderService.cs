@@ -100,6 +100,58 @@ public class WorkOrderService(
         return ToResponse(workOrder);
     }
 
+    public async Task<DeleteWorkOrderImpactResponse> GetDeleteWorkOrderImpactAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        var workOrder = await GetWorkOrderEntityAsync(id, cancellationToken);
+        
+        var dailyReportsCount = await workOrderRepository.CountDailyReportsByWorkOrderAsync(id, cancellationToken);
+        var issuesCount = await workOrderRepository.CountIssuesByWorkOrderAsync(id, cancellationToken);
+        var materialRequestsCount = await workOrderRepository.CountMaterialRequestsByWorkOrderAsync(id, cancellationToken);
+        var hasConfirmedIssues = await workOrderRepository.HasConfirmedIssuesForWorkOrderAsync(id, cancellationToken);
+        
+        return new DeleteWorkOrderImpactResponse(
+            dailyReportsCount,
+            issuesCount,
+            materialRequestsCount,
+            workOrder.OrderedWorks.Count,
+            workOrder.OrderedMaterials.Count,
+            hasConfirmedIssues,
+            !hasConfirmedIssues
+        );
+    }
+
+    public async Task DeleteWorkOrderAsync(Guid id, Guid userId, CancellationToken cancellationToken = default)
+    {
+        var workOrder = await GetWorkOrderEntityAsync(id, cancellationToken);
+        
+        var hasConfirmedIssues = await workOrderRepository.HasConfirmedIssuesForWorkOrderAsync(id, cancellationToken);
+        if (hasConfirmedIssues)
+        {
+            throw new ValidationException("Nie można usunąć zlecenia z potwierdzonymi wydaniami magazynowymi.");
+        }
+
+        // Clear WorkOrderId from DailyReports (set to null)
+        await workOrderRepository.ClearWorkOrderFromDailyReportsAsync(id, cancellationToken);
+        
+        // Remove Issues (only if no confirmed ones)
+        await workOrderRepository.RemoveIssuesByWorkOrderAsync(id, cancellationToken);
+        
+        // Remove MaterialRequests
+        await workOrderRepository.RemoveMaterialRequestsByWorkOrderAsync(id, cancellationToken);
+        
+        // OrderedWorks, OrderedMaterials, DailyReportWorkOrders will be cascade deleted
+        workOrderRepository.RemoveWorkOrder(workOrder);
+        
+        await workOrderRepository.SaveChangesAsync(cancellationToken);
+        
+        await auditService.LogActionAsync(userId, "DELETE_WORK_ORDER", "WorkOrder", id, new
+        {
+            workOrder.Number,
+            workOrder.ProjectId,
+            workOrder.Status,
+        }, cancellationToken);
+    }
+
     public async Task<WorkOrderResponse> AddOrderedWorkAsync(
         Guid id,
         AddOrderedWorkRequest request,

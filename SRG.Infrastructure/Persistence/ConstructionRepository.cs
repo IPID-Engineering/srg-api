@@ -147,7 +147,7 @@ public class ConstructionRepository(AppDbContext dbContext) : IConstructionRepos
     public Task<List<SubcontractorWorker>> GetSubcontractorWorkersAsync(Guid subcontractorId, CancellationToken cancellationToken = default)
     {
         return dbContext.SubcontractorWorkers
-            .Where(worker => worker.SubcontractorId == subcontractorId)
+            .Where(worker => worker.SubcontractorId == subcontractorId && worker.CrewId != null)
             .OrderBy(worker => worker.LastName)
             .ThenBy(worker => worker.FirstName)
             .ToListAsync(cancellationToken);
@@ -187,6 +187,13 @@ public class ConstructionRepository(AppDbContext dbContext) : IConstructionRepos
     public void RemoveSubcontractorWorker(SubcontractorWorker worker)
     {
         dbContext.SubcontractorWorkers.Remove(worker);
+    }
+
+    public async Task<int> ClearInewiMappingsForOrphanedWorkersAsync(Guid subcontractorId, CancellationToken cancellationToken = default)
+    {
+        return await dbContext.SubcontractorWorkers
+            .Where(w => w.SubcontractorId == subcontractorId && w.CrewId == null && w.InewiEmployeeId != null)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(w => w.InewiEmployeeId, (string?)null), cancellationToken);
     }
 
     public Task<List<SubcontractorWorker>> GetSubcontractorWorkersByCrewAsync(Guid crewId, CancellationToken cancellationToken = default)

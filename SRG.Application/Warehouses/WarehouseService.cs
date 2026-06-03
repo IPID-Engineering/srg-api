@@ -191,10 +191,11 @@ public class WarehouseService(IWarehouseRepository warehouse, IConstructionRepos
 
     public static async Task<Warehouse> EnsureSubWarehouseAsync(
         IWarehouseRepository warehouse,
-        Guid foremanId,
-        CancellationToken cancellationToken = default)
+        Guid ownerId,
+        CancellationToken cancellationToken = default,
+        string? crewName = null)
     {
-        var existing = await warehouse.GetSubWarehouseByOwnerAsync(foremanId, cancellationToken);
+        var existing = await warehouse.GetSubWarehouseByOwnerAsync(ownerId, cancellationToken);
 
         if (existing is not null)
         {
@@ -203,9 +204,9 @@ public class WarehouseService(IWarehouseRepository warehouse, IConstructionRepos
 
         var created = new Warehouse
         {
-            Name = $"SubWarehouse {foremanId}",
+            Name = crewName ?? "Magazyn brygady",
             Type = WarehouseType.Sub,
-            OwnerId = foremanId,
+            OwnerId = ownerId,
         };
 
         await warehouse.AddWarehouseAsync(created, cancellationToken);

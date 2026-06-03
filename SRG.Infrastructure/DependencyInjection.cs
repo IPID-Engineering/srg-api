@@ -4,11 +4,13 @@ using Microsoft.Extensions.DependencyInjection;
 using SRG.Application.Audit;
 using SRG.Application.Analytics;
 using SRG.Application.Export;
+using SRG.Application.Inewi;
 using SRG.Application.Persistence;
 using SRG.Infrastructure.Audit;
 using SRG.Infrastructure.Analytics;
 using SRG.Infrastructure.DailyReports;
 using SRG.Infrastructure.Export;
+using SRG.Infrastructure.Inewi;
 using SRG.Infrastructure.Persistence;
 
 namespace SRG.Infrastructure;
@@ -33,6 +35,9 @@ public static class DependencyInjection
         services.AddScoped<IExportService, ExportService>();
         services.AddScoped<IInewiRepository, InewiRepository>();
         services.AddHostedService<DailyReportAutoCreationService>();
+        
+        // Inewi API client
+        services.AddHttpClient<IInewiApiClient, InewiApiClient>();
 
         return services;
     }

@@ -4,7 +4,9 @@ using SRG.Domain.Entities;
 
 namespace SRG.Application.Construction;
 
-public class SubcontractorWorkerService(IConstructionRepository construction) : ISubcontractorWorkerService
+public class SubcontractorWorkerService(
+    IConstructionRepository construction,
+    IDailyReportRepository dailyReports) : ISubcontractorWorkerService
 {
     public async Task<SubcontractorWorkerResponse> CreateAsync(
         CreateSubcontractorWorkerRequest request,
@@ -88,8 +90,31 @@ public class SubcontractorWorkerService(IConstructionRepository construction) : 
             throw new ValidationException("Subcontractor can remove only their own workers.");
         }
 
+        // Remove all work hours related to this worker before deleting
+        await dailyReports.RemoveWorkHoursBySubcontractorWorkerAsync(id, cancellationToken);
+
         construction.RemoveSubcontractorWorker(worker);
         await construction.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<DeleteWorkerImpactResponse> GetDeleteWorkerImpactAsync(Guid id, Guid subcontractorId, CancellationToken cancellationToken = default)
+    {
+        var worker = await construction.GetSubcontractorWorkerByIdAsync(id, cancellationToken)
+            ?? throw new KeyNotFoundException("Subcontractor worker was not found.");
+
+        if (worker.SubcontractorId != subcontractorId)
+        {
+            throw new ValidationException("Subcontractor can view only their own workers.");
+        }
+
+        var workHoursCount = await dailyReports.CountWorkHoursBySubcontractorWorkerAsync(id, cancellationToken);
+
+        return new DeleteWorkerImpactResponse(
+            worker.Id,
+            worker.FirstName,
+            worker.LastName,
+            workHoursCount
+        );
     }
 
     private static SubcontractorWorkerResponse ToResponse(SubcontractorWorker worker)
@@ -105,6 +130,7 @@ public class SubcontractorWorkerService(IConstructionRepository construction) : 
             // DefaultPassword jest widoczne tylko do momentu pierwszego logowania brygadzisty
             worker.DefaultPassword,
             isForeman,
+            worker.InewiEmployeeId,
             worker.CreatedAt);
     }
 }

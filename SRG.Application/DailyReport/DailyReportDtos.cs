@@ -55,9 +55,9 @@ public record DailyReportCalendarResponse(
     bool HasUnresolvedComments,
     int UnresolvedCommentCount);
 
-public record AddWorkHourRequest(Guid? WorkerId, Guid? SubcontractorWorkerId, decimal Hours);
+public record AddWorkHourRequest(Guid? WorkerId, Guid? SubcontractorWorkerId, decimal Hours, bool IsAbsent = false);
 
-public record WorkHourResponse(Guid Id, Guid DailyReportId, Guid? WorkerId, Guid? SubcontractorWorkerId, string? WorkerName, decimal Hours);
+public record WorkHourResponse(Guid Id, Guid DailyReportId, Guid? WorkerId, Guid? SubcontractorWorkerId, string? WorkerName, decimal Hours, bool IsAbsent);
 
 public record AddWorkEntryRequest(Guid WorkTypeId, Guid? OrderedWorkId, string? Description, decimal Quantity);
 
@@ -115,7 +115,7 @@ public record DailyReportStatusHistoryResponse(
     DailyReportStatus FromStatus,
     DailyReportStatus ToStatus,
     string? Reason,
-    Guid ChangedById,
+    Guid? ChangedById,
     string? ChangedByEmail,
     DateTime ChangedAt);
 

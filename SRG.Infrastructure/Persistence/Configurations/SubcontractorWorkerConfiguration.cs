@@ -32,5 +32,8 @@ public class SubcontractorWorkerConfiguration : IEntityTypeConfiguration<Subcont
             .WithMany(crew => crew.Workers)
             .HasForeignKey(worker => worker.CrewId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        builder.Property(worker => worker.InewiEmployeeId)
+            .HasMaxLength(50);
     }
 }

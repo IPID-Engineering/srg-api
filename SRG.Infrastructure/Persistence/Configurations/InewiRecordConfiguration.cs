@@ -28,9 +28,9 @@ public class InewiRecordConfiguration : IEntityTypeConfiguration<InewiRecord>
         builder.Property(r => r.ImportedAt)
             .IsRequired();
 
-        builder.HasOne(r => r.SubcontractorCrew)
+        builder.HasOne(r => r.Subcontractor)
             .WithMany()
-            .HasForeignKey(r => r.SubcontractorCrewId)
+            .HasForeignKey(r => r.SubcontractorId)
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne(r => r.ImportedBy)
@@ -38,7 +38,7 @@ public class InewiRecordConfiguration : IEntityTypeConfiguration<InewiRecord>
             .HasForeignKey(r => r.ImportedById)
             .OnDelete(DeleteBehavior.Restrict);
 
-        builder.HasIndex(r => new { r.SubcontractorCrewId, r.Date, r.WorkerName })
+        builder.HasIndex(r => new { r.SubcontractorId, r.Date, r.WorkerName })
             .IsUnique();
     }
 }

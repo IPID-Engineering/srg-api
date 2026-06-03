@@ -10,7 +10,16 @@ public class DailyReportStatusHistory
     public DailyReportStatus FromStatus { get; set; }
     public DailyReportStatus ToStatus { get; set; }
     public string? Reason { get; set; }
-    public Guid ChangedById { get; set; }
+    
+    public Guid? ChangedById { get; set; }
     public User? ChangedBy { get; set; }
+    
+    /// <summary>
+    /// For changes made by foremen (not in Users table)
+    /// </summary>
+    public Guid? ChangedByWorkerId { get; set; }
+    public SubcontractorWorker? ChangedByWorker { get; set; }
+    public string? ChangedByEmail { get; set; }
+    
     public DateTime ChangedAt { get; set; } = DateTime.UtcNow;
 }

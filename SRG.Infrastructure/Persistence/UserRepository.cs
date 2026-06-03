@@ -17,6 +17,21 @@ public class UserRepository(AppDbContext dbContext) : IUserRepository
         return dbContext.Users.FirstOrDefaultAsync(user => user.Id == id, cancellationToken);
     }
 
+    public Task<User?> GetByActivationTokenAsync(string token, CancellationToken cancellationToken = default)
+    {
+        return dbContext.Users.FirstOrDefaultAsync(user => user.ActivationToken == token, cancellationToken);
+    }
+
+    public Task<User?> GetByMicrosoftSubjectIdAsync(string subjectId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.Users.FirstOrDefaultAsync(user => user.MicrosoftSubjectId == subjectId, cancellationToken);
+    }
+
+    public Task<User?> GetByOneTimeLoginTokenAsync(string token, CancellationToken cancellationToken = default)
+    {
+        return dbContext.Users.FirstOrDefaultAsync(user => user.OneTimeLoginToken == token, cancellationToken);
+    }
+
     public Task<List<User>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return dbContext.Users.OrderByDescending(u => u.CreatedAt).ToListAsync(cancellationToken);

@@ -43,24 +43,6 @@ public class ForemanWorkersController(IForemanWorkerService foremanWorkerService
         }
     }
 
-    [HttpDelete("{id:guid}")]
-    public async Task<IActionResult> RemoveWorker(Guid id, CancellationToken cancellationToken)
-    {
-        try
-        {
-            await foremanWorkerService.RemoveWorkerAsync(id, User.GetUserId(), cancellationToken);
-            return NoContent();
-        }
-        catch (ValidationException exception)
-        {
-            return BadRequest(new { message = exception.Message });
-        }
-        catch (KeyNotFoundException exception)
-        {
-            return NotFound(new { message = exception.Message });
-        }
-    }
-
     [HttpGet("{id:guid}/stats")]
     public async Task<ActionResult<ForemanWorkerStatsResponse>> GetWorkerStats(Guid id, CancellationToken cancellationToken)
     {

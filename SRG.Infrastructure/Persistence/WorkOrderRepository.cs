@@ -87,6 +87,11 @@ public class WorkOrderRepository(AppDbContext dbContext) : IWorkOrderRepository
         await dbContext.WorkOrders.AddAsync(workOrder, cancellationToken);
     }
 
+    public void RemoveWorkOrder(WorkOrder workOrder)
+    {
+        dbContext.WorkOrders.Remove(workOrder);
+    }
+
     public async Task AddOrderedWorkAsync(OrderedWork orderedWork, CancellationToken cancellationToken = default)
     {
         await dbContext.OrderedWorks.AddAsync(orderedWork, cancellationToken);
@@ -115,6 +120,73 @@ public class WorkOrderRepository(AppDbContext dbContext) : IWorkOrderRepository
     public Task<OrderedMaterial?> GetOrderedMaterialByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
         return dbContext.OrderedMaterials.Include(material => material.Material).FirstOrDefaultAsync(material => material.Id == id, cancellationToken);
+    }
+
+    public async Task ClearSubcontractorCrewFromWorkOrdersAsync(Guid subcontractorCrewId, CancellationToken cancellationToken = default)
+    {
+        var workOrders = await dbContext.WorkOrders
+            .Where(wo => wo.SubcontractorCrewId == subcontractorCrewId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var workOrder in workOrders)
+        {
+            workOrder.SubcontractorCrewId = null;
+        }
+    }
+
+    public Task<int> CountWorkOrdersBySubcontractorCrewAsync(Guid subcontractorCrewId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.WorkOrders
+            .CountAsync(wo => wo.SubcontractorCrewId == subcontractorCrewId, cancellationToken);
+    }
+
+    public async Task ClearWorkOrderFromDailyReportsAsync(Guid workOrderId, CancellationToken cancellationToken = default)
+    {
+        var dailyReports = await dbContext.DailyReports
+            .Where(dr => dr.WorkOrderId == workOrderId)
+            .ToListAsync(cancellationToken);
+
+        foreach (var report in dailyReports)
+        {
+            report.WorkOrderId = null;
+        }
+    }
+
+    public Task<int> CountDailyReportsByWorkOrderAsync(Guid workOrderId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.DailyReports.CountAsync(dr => dr.WorkOrderId == workOrderId, cancellationToken);
+    }
+
+    public Task<int> CountIssuesByWorkOrderAsync(Guid workOrderId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.Issues.CountAsync(i => i.WorkOrderId == workOrderId, cancellationToken);
+    }
+
+    public Task<bool> HasConfirmedIssuesForWorkOrderAsync(Guid workOrderId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.Issues.AnyAsync(i => i.WorkOrderId == workOrderId && i.Status == Domain.Enums.IssueStatus.Confirmed, cancellationToken);
+    }
+
+    public Task<int> CountMaterialRequestsByWorkOrderAsync(Guid workOrderId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.MaterialRequests.CountAsync(mr => mr.WorkOrderId == workOrderId, cancellationToken);
+    }
+
+    public async Task RemoveMaterialRequestsByWorkOrderAsync(Guid workOrderId, CancellationToken cancellationToken = default)
+    {
+        var requests = await dbContext.MaterialRequests
+            .Where(mr => mr.WorkOrderId == workOrderId)
+            .ToListAsync(cancellationToken);
+        dbContext.MaterialRequests.RemoveRange(requests);
+    }
+
+    public async Task RemoveIssuesByWorkOrderAsync(Guid workOrderId, CancellationToken cancellationToken = default)
+    {
+        var issues = await dbContext.Issues
+            .Include(i => i.Items)
+            .Where(i => i.WorkOrderId == workOrderId)
+            .ToListAsync(cancellationToken);
+        dbContext.Issues.RemoveRange(issues);
     }
 
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default)

@@ -10,4 +10,5 @@ public class WorkHour
     public Guid? SubcontractorWorkerId { get; set; }
     public SubcontractorWorker? SubcontractorWorker { get; set; }
     public decimal Hours { get; set; }
+    public bool IsAbsent { get; set; }
 }

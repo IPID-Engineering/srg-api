@@ -34,6 +34,13 @@ public class SubcontractorWorker
     public Guid? CrewId { get; set; }
     public SubcontractorCrew? Crew { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    
+    /// <summary>
+    /// ID pracownika w systemie inewi (do integracji RCP).
+    /// Ustawiany przez podwykonawcę przy mapowaniu pracowników.
+    /// </summary>
+    public string? InewiEmployeeId { get; set; }
+    
     public ICollection<WorkHour> WorkHours { get; set; } = [];
     public ICollection<SubcontractorForemanHistory> ForemanHistory { get; set; } = [];
 }

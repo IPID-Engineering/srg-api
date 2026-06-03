@@ -90,3 +90,12 @@ public record WorkOrderProgressResponse(
     decimal PlannedMaterialQuantity,
     decimal UsedMaterialQuantity,
     decimal ProgressPercentage);
+
+public record DeleteWorkOrderImpactResponse(
+    int DailyReportsCount,
+    int IssuesCount,
+    int MaterialRequestsCount,
+    int OrderedWorksCount,
+    int OrderedMaterialsCount,
+    bool HasConfirmedIssues,
+    bool CanDelete);

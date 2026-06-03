@@ -51,4 +51,21 @@ public class MaterialsController(IMaterialService materialService) : ControllerB
             return NotFound(new { message = exception.Message });
         }
     }
+
+    [HttpPost("{id:guid}/check-availability")]
+    [Authorize(Roles = "PM,SPM,Logistician,Foreman,SubcontractorForeman")]
+    public async Task<ActionResult<MaterialAvailabilityResponse>> CheckAvailability(
+        Guid id,
+        CheckMaterialAvailabilityRequest request,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return Ok(await materialService.CheckAvailabilityAsync(id, request, cancellationToken));
+        }
+        catch (KeyNotFoundException exception)
+        {
+            return NotFound(new { message = exception.Message });
+        }
+    }
 }

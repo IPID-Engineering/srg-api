@@ -12,4 +12,23 @@ public record CreateForemanRequest(string Email, string Password, string FirstNa
 
 public record UpdateUserRequest(string? Email, string? FirstName, string? LastName, UserRole? Role);
 
-public record UserResponse(Guid Id, string Email, string FirstName, string LastName, string FullName, UserRole Role, bool IsActive, DateTime CreatedAt);
+public record UserResponse(
+    Guid Id, 
+    string Email, 
+    string FirstName, 
+    string LastName, 
+    string FullName, 
+    UserRole Role, 
+    bool IsActive, 
+    DateTime CreatedAt, 
+    bool IsMicrosoftLinked = false, 
+    bool HasActivationToken = false,
+    bool IsBanned = false,
+    string? BanReason = null);
+
+public record BanUserRequest(string? Reason);
+public record UnbanUserRequest();
+
+// One-time login token
+public record OneTimeTokenResponse(string Token, DateTime ExpiresAt);
+public record OneTimeLoginRequest(string Token);

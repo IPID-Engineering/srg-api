@@ -8,10 +8,12 @@ public record MaterialRequestResponse(
     string WorkOrderNumber,
     Guid MaterialId,
     string MaterialName,
+    string Unit,
     decimal Quantity,
     string? Notes,
     string Status,
     Guid CreatedById,
+    string? CreatedByName,
     DateTime CreatedAt,
     Guid? ProcessedById,
     DateTime? ProcessedAt,
@@ -30,16 +32,22 @@ public static class MaterialRequestMapper
 {
     public static MaterialRequestResponse ToResponse(MaterialRequest request)
     {
+        var createdByName = request.CreatedByWorker != null 
+            ? $"{request.CreatedByWorker.FirstName} {request.CreatedByWorker.LastName}"
+            : null;
+            
         return new MaterialRequestResponse(
             request.Id,
             request.WorkOrderId,
             request.WorkOrder?.Number ?? "",
             request.MaterialId,
             request.Material?.Name ?? "",
+            request.Material?.Unit ?? "szt.",
             request.Quantity,
             request.Notes,
             request.Status.ToString(),
             request.CreatedById,
+            createdByName,
             request.CreatedAt,
             request.ProcessedById,
             request.ProcessedAt,

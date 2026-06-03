@@ -42,6 +42,26 @@ public class DailyReportRepository(AppDbContext dbContext) : IDailyReportReposit
             .ToListAsync(cancellationToken);
     }
 
+    public Task<List<ForemanDkpCalendarItem>> GetCalendarItemsAsync(
+        Guid crewId,
+        DateOnly startDate,
+        DateOnly endDate,
+        CancellationToken cancellationToken = default)
+    {
+        return dbContext.DailyReports
+            .Where(dr => (dr.CrewId == crewId || dr.SubcontractorCrewId == crewId) && dr.Date >= startDate && dr.Date <= endDate)
+            .OrderBy(dr => dr.Date)
+            .Select(dr => new ForemanDkpCalendarItem
+            {
+                Id = dr.Id,
+                Date = dr.Date,
+                Status = dr.Status.ToString(),
+                TotalHours = dr.WorkHours.Sum(wh => wh.Hours),
+                HasWork = dr.WorkHours.Count > 0
+            })
+            .ToListAsync(cancellationToken);
+    }
+
     public Task<List<DailyReport>> GetByStatusAsync(DailyReportStatus status, CancellationToken cancellationToken = default)
     {
         return DailyReportQuery()
@@ -149,6 +169,44 @@ public class DailyReportRepository(AppDbContext dbContext) : IDailyReportReposit
         return Task.CompletedTask;
     }
 
+    public Task<List<DailyReport>> GetBySubcontractorCrewAsync(Guid subcontractorCrewId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.DailyReports
+            .Where(dr => dr.SubcontractorCrewId == subcontractorCrewId)
+            .ToListAsync(cancellationToken);
+    }
+
+    public void RemoveDailyReport(DailyReport dailyReport)
+    {
+        dbContext.DailyReports.Remove(dailyReport);
+    }
+
+    public void RemoveDailyReports(IEnumerable<DailyReport> dailyReports)
+    {
+        dbContext.DailyReports.RemoveRange(dailyReports);
+    }
+
+    public async Task RemoveWorkHoursBySubcontractorWorkerAsync(Guid subcontractorWorkerId, CancellationToken cancellationToken = default)
+    {
+        var workHours = await dbContext.WorkHours
+            .Where(wh => wh.SubcontractorWorkerId == subcontractorWorkerId)
+            .ToListAsync(cancellationToken);
+        
+        dbContext.WorkHours.RemoveRange(workHours);
+    }
+
+    public Task<int> CountDailyReportsBySubcontractorCrewAsync(Guid subcontractorCrewId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.DailyReports
+            .CountAsync(dr => dr.SubcontractorCrewId == subcontractorCrewId, cancellationToken);
+    }
+
+    public Task<int> CountWorkHoursBySubcontractorWorkerAsync(Guid subcontractorWorkerId, CancellationToken cancellationToken = default)
+    {
+        return dbContext.WorkHours
+            .CountAsync(wh => wh.SubcontractorWorkerId == subcontractorWorkerId, cancellationToken);
+    }
+
     public async Task SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         await dbContext.SaveChangesAsync(cancellationToken);
@@ -228,6 +286,7 @@ public class DailyReportRepository(AppDbContext dbContext) : IDailyReportReposit
             .Include(r => r.Comments).ThenInclude(c => c.SubcontractorWorker)
             .Include(r => r.Comments).ThenInclude(c => c.Replies).ThenInclude(reply => reply.Author)
             .Include(r => r.Comments).ThenInclude(c => c.Replies).ThenInclude(reply => reply.SubcontractorWorker)
+            .Include(r => r.StatusHistory)
             .Include(r => r.DailyReportWorkOrders).ThenInclude(drwo => drwo.WorkOrder).ThenInclude(wo => wo!.OrderedWorks).ThenInclude(ow => ow.WorkType);
     }
 }

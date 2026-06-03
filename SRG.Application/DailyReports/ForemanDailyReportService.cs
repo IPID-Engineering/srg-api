@@ -2,6 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.Json;
 using SRG.Application.Common;
 using SRG.Application.Persistence;
+using SRG.Application.Warehouses;
 using SRG.Domain.Entities;
 using SRG.Domain.Enums;
 
@@ -24,6 +25,7 @@ public interface IForemanDailyReportService
 public class ForemanDailyReportService(
     IDailyReportRepository dailyReportRepository,
     IConstructionRepository constructionRepository,
+    IWarehouseRepository warehouseRepository,
     ICurrentUserContext currentUserContext) : IForemanDailyReportService
 {
     public async Task<ForemanDkpResponse> GetOrCreateForDateAsync(DateOnly date, Guid crewId, Guid userId, CancellationToken cancellationToken)
@@ -41,33 +43,10 @@ public class ForemanDailyReportService(
     public async Task<List<ForemanDkpCalendarItem>> GetCalendarWithAutoCreateAsync(Guid crewId, Guid userId, CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(DateTime.Now);
-        var startDate = today.AddDays(-7);
-        var endDate = today.AddDays(7);
+        var startOfMonth = new DateOnly(today.Year, today.Month, 1);
+        var endOfMonth = startOfMonth.AddMonths(1).AddDays(-1);
 
-        var existingReports = await dailyReportRepository.GetByCrewDateRangeAsync(crewId, startDate, endDate, cancellationToken);
-
-        var result = new List<ForemanDkpCalendarItem>();
-
-        for (var date = startDate; date <= endDate; date = date.AddDays(1))
-        {
-            var report = existingReports.FirstOrDefault(r => r.Date == date);
-            
-            if (report == null)
-            {
-                report = await CreateReportForDateAsync(crewId, userId, date, cancellationToken);
-            }
-
-            result.Add(new ForemanDkpCalendarItem
-            {
-                Id = report.Id,
-                Date = report.Date,
-                Status = report.Status.ToString(),
-                TotalHours = report.WorkHours.Sum(wh => wh.Hours),
-                HasWork = report.WorkHours.Count != 0
-            });
-        }
-
-        return result.OrderBy(x => x.Date).ToList();
+        return await dailyReportRepository.GetCalendarItemsAsync(crewId, startOfMonth, endOfMonth, cancellationToken);
     }
 
     public async Task<ForemanDkpResponse> AddHoursAsync(Guid reportId, AddForemanHoursRequest request, Guid crewId, CancellationToken cancellationToken)
@@ -80,12 +59,15 @@ public class ForemanDailyReportService(
         var worker = await constructionRepository.GetSubcontractorWorkerByIdAsync(request.WorkerId, cancellationToken)
             ?? throw new KeyNotFoundException("Pracownik nie został znaleziony.");
 
+        var hours = request.IsAbsent ? 0 : request.Hours;
+
         var existingHours = report.WorkHours.FirstOrDefault(wh => wh.SubcontractorWorkerId == request.WorkerId);
         if (existingHours != null)
         {
-            var oldValues = new { existingHours.Hours };
-            existingHours.Hours = request.Hours;
-            var newValues = new { Hours = request.Hours };
+            var oldValues = new { existingHours.Hours, existingHours.IsAbsent };
+            existingHours.Hours = hours;
+            existingHours.IsAbsent = request.IsAbsent;
+            var newValues = new { Hours = hours, IsAbsent = request.IsAbsent };
             
             await RecordChangeAsync(reportId, "WorkHour", existingHours.Id, "Updated", oldValues, newValues, cancellationToken);
         }
@@ -96,11 +78,12 @@ public class ForemanDailyReportService(
                 Id = Guid.NewGuid(),
                 DailyReportId = reportId,
                 SubcontractorWorkerId = request.WorkerId,
-                Hours = request.Hours
+                Hours = hours,
+                IsAbsent = request.IsAbsent
             };
             await dailyReportRepository.AddWorkHoursAsync(newWorkHour, cancellationToken);
             
-            await RecordChangeAsync(reportId, "WorkHour", newWorkHour.Id, "Created", null, new { newWorkHour.Hours, newWorkHour.SubcontractorWorkerId }, cancellationToken);
+            await RecordChangeAsync(reportId, "WorkHour", newWorkHour.Id, "Created", null, new { Hours = hours, IsAbsent = request.IsAbsent, newWorkHour.SubcontractorWorkerId }, cancellationToken);
         }
 
         await dailyReportRepository.SaveChangesAsync(cancellationToken);
@@ -180,17 +163,39 @@ public class ForemanDailyReportService(
         if (report.Status != DailyReportStatus.Draft && report.Status != DailyReportStatus.Rejected)
             throw new ValidationException("Nie można edytować karty która nie jest szkicem lub nie wymaga poprawek.");
 
+        var warehouse = await warehouseRepository.GetSubWarehouseByOwnerAsync(crewId, cancellationToken);
+        
         var existingUsage = report.MaterialUsages.FirstOrDefault(mu => mu.MaterialId == request.MaterialId);
         if (existingUsage != null)
         {
+            var oldQuantity = existingUsage.Quantity;
+            var quantityDiff = request.Quantity - oldQuantity;
+            
+            if (warehouse != null && quantityDiff != 0)
+            {
+                if (quantityDiff > 0)
+                {
+                    await StockService.ReserveMaterialAsync(warehouseRepository, warehouse.Id, request.MaterialId, quantityDiff, cancellationToken);
+                }
+                else
+                {
+                    await StockService.ReleaseReservationAsync(warehouseRepository, warehouse.Id, request.MaterialId, Math.Abs(quantityDiff), cancellationToken);
+                }
+            }
+            
             var oldValues = new { existingUsage.Quantity };
             existingUsage.Quantity = request.Quantity;
             var newValues = new { Quantity = request.Quantity };
             
             await RecordChangeAsync(reportId, "MaterialUsage", existingUsage.Id, "Updated", oldValues, newValues, cancellationToken);
         }
-        else
+        else if (request.Quantity > 0)
         {
+            if (warehouse != null)
+            {
+                await StockService.ReserveMaterialAsync(warehouseRepository, warehouse.Id, request.MaterialId, request.Quantity, cancellationToken);
+            }
+            
             var materialUsage = new MaterialUsage
             {
                 Id = Guid.NewGuid(),
@@ -283,7 +288,40 @@ public class ForemanDailyReportService(
         if (report.WorkHours.Count == 0)
             throw new ValidationException("Karta musi zawierać przynajmniej jednego pracownika z godzinami.");
 
-        report.Status = DailyReportStatus.Submitted;
+        var previousStatus = report.Status;
+        DailyReportStatus nextStatus = DailyReportStatus.Submitted;
+        
+        if (previousStatus == DailyReportStatus.Rejected)
+        {
+            var lastRejection = report.StatusHistory
+                .Where(h => h.ToStatus == DailyReportStatus.Rejected)
+                .OrderByDescending(h => h.ChangedAt)
+                .FirstOrDefault();
+            
+            if (lastRejection?.FromStatus == DailyReportStatus.SpmReview)
+            {
+                nextStatus = DailyReportStatus.SpmReview;
+            }
+            else if (lastRejection?.FromStatus == DailyReportStatus.SubcontractorReview)
+            {
+                nextStatus = DailyReportStatus.SubcontractorReview;
+            }
+        }
+
+        report.Status = nextStatus;
+        report.RejectionReason = null;
+        
+        var history = new DailyReportStatusHistory
+        {
+            DailyReportId = reportId,
+            FromStatus = previousStatus,
+            ToStatus = nextStatus,
+            ChangedById = null,
+            ChangedByWorkerId = currentUserContext.UserId,
+            ChangedByEmail = currentUserContext.Email,
+            ChangedAt = DateTime.UtcNow,
+        };
+        await dailyReportRepository.AddStatusHistoryAsync(history, cancellationToken);
         await dailyReportRepository.SaveChangesAsync(cancellationToken);
 
         return await GetReportResponseAsync(reportId, cancellationToken);
@@ -373,7 +411,8 @@ public class ForemanDailyReportService(
                     : wh.Worker != null
                         ? $"{wh.Worker.FirstName} {wh.Worker.LastName}"
                         : "Nieznany",
-                Hours = wh.Hours
+                Hours = wh.Hours,
+                IsAbsent = wh.IsAbsent
             }).ToList(),
             WorkEntries = report.WorkEntries.Select(we => new ForemanWorkEntryItem
             {
@@ -436,7 +475,18 @@ public class ForemanDailyReportService(
                     PlannedQuantity = ow.PlannedQuantity,
                     Description = ow.Description
                 }).ToList() ?? []
-            }).ToList()
+            }).ToList(),
+            ChangeHistory = report.ChangeHistory.Select(ch => new ForemanChangeHistoryItem
+            {
+                Id = ch.Id,
+                EntryType = ch.EntryType,
+                EntryId = ch.EntryId,
+                ChangeType = ch.ChangeType,
+                OldValues = ch.OldValues,
+                NewValues = ch.NewValues,
+                ChangedByEmail = ch.ChangedByEmail,
+                ChangedAt = ch.ChangedAt
+            }).OrderByDescending(ch => ch.ChangedAt).ToList()
         };
     }
 }
@@ -457,6 +507,19 @@ public class ForemanDkpResponse
     public List<ForemanMaterialUsageItem> MaterialUsages { get; set; } = [];
     public List<ForemanCommentItem> Comments { get; set; } = [];
     public List<ForemanWorkOrderItem> WorkOrders { get; set; } = [];
+    public List<ForemanChangeHistoryItem> ChangeHistory { get; set; } = [];
+}
+
+public class ForemanChangeHistoryItem
+{
+    public Guid Id { get; set; }
+    public required string EntryType { get; set; }
+    public Guid EntryId { get; set; }
+    public required string ChangeType { get; set; }
+    public string? OldValues { get; set; }
+    public string? NewValues { get; set; }
+    public string? ChangedByEmail { get; set; }
+    public DateTime ChangedAt { get; set; }
 }
 
 public class ForemanWorkOrderItem
@@ -506,6 +569,7 @@ public class ForemanWorkHoursItem
     public Guid WorkerId { get; set; }
     public required string WorkerName { get; set; }
     public decimal Hours { get; set; }
+    public bool IsAbsent { get; set; }
 }
 
 public class ForemanWorkEntryItem
@@ -544,6 +608,6 @@ public class ForemanDkpCalendarItem
     public bool HasWork { get; set; }
 }
 
-public record AddForemanHoursRequest(Guid WorkerId, decimal Hours);
+public record AddForemanHoursRequest(Guid WorkerId, decimal Hours, bool IsAbsent = false);
 public record AddForemanWorkRequest(Guid WorkTypeId, decimal Quantity, string? Description, Guid? OrderedWorkId, int WorkerCount = 0, decimal HoursSpent = 0);
 public record AddForemanMaterialRequest(Guid MaterialId, decimal Quantity);

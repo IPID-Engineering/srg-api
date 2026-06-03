@@ -187,6 +187,9 @@ public class WarehouseRepository(AppDbContext dbContext) : IWarehouseRepository
     {
         return dbContext.Issues
             .Include(issue => issue.WorkOrder)
+                .ThenInclude(wo => wo!.Crew)
+            .Include(issue => issue.WorkOrder)
+                .ThenInclude(wo => wo!.SubcontractorCrew)
             .Include(issue => issue.ToWarehouse)
             .Include(issue => issue.Items)
             .ThenInclude(item => item.Material)
@@ -198,6 +201,9 @@ public class WarehouseRepository(AppDbContext dbContext) : IWarehouseRepository
     {
         return dbContext.Issues
             .Include(issue => issue.WorkOrder)
+                .ThenInclude(wo => wo!.Crew)
+            .Include(issue => issue.WorkOrder)
+                .ThenInclude(wo => wo!.SubcontractorCrew)
             .Include(issue => issue.ToWarehouse)
             .Include(issue => issue.Items)
             .ThenInclude(item => item.Material)
@@ -210,8 +216,15 @@ public class WarehouseRepository(AppDbContext dbContext) : IWarehouseRepository
     {
         return dbContext.Issues
             .Include(issue => issue.WorkOrder)
+                .ThenInclude(wo => wo!.Crew)
+            .Include(issue => issue.WorkOrder)
+                .ThenInclude(wo => wo!.SubcontractorCrew)
+            .Include(issue => issue.WorkOrder)
+                .ThenInclude(wo => wo!.Project)
+            .Include(issue => issue.ToWarehouse)
+            .Include(issue => issue.CreatedBy)
             .Include(issue => issue.Items)
-            .ThenInclude(item => item.Material)
+                .ThenInclude(item => item.Material)
             .FirstOrDefaultAsync(issue => issue.Id == id, cancellationToken);
     }
 
@@ -324,6 +337,7 @@ public class WarehouseRepository(AppDbContext dbContext) : IWarehouseRepository
         return dbContext.MaterialRequests
             .Include(r => r.WorkOrder)
             .Include(r => r.Material)
+            .Include(r => r.CreatedByWorker)
             .Where(r => r.WorkOrderId == workOrderId)
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync(cancellationToken);
@@ -334,6 +348,7 @@ public class WarehouseRepository(AppDbContext dbContext) : IWarehouseRepository
         return dbContext.MaterialRequests
             .Include(r => r.WorkOrder)
             .Include(r => r.Material)
+            .Include(r => r.CreatedByWorker)
             .Where(r => r.Status == MaterialRequestStatus.Pending)
             .OrderBy(r => r.CreatedAt)
             .ToListAsync(cancellationToken);
@@ -344,6 +359,7 @@ public class WarehouseRepository(AppDbContext dbContext) : IWarehouseRepository
         return dbContext.MaterialRequests
             .Include(r => r.WorkOrder)
             .Include(r => r.Material)
+            .Include(r => r.CreatedByWorker)
             .FirstOrDefaultAsync(r => r.Id == id, cancellationToken);
     }
 

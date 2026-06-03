@@ -8,6 +8,8 @@ namespace SRG.Application.Construction;
 
 public class SubcontractorCrewService(
     IConstructionRepository construction,
+    IDailyReportRepository dailyReports,
+    IWorkOrderRepository workOrders,
     IPasswordService passwordService) : ISubcontractorCrewService
 {
     public async Task<SubcontractorCrewResponse> CreateAsync(
@@ -160,8 +162,40 @@ public class SubcontractorCrewService(
             throw new ValidationException("You can only remove your own crews.");
         }
 
+        // Clear SubcontractorCrewId from WorkOrders (nullable FK)
+        await workOrders.ClearSubcontractorCrewFromWorkOrdersAsync(id, cancellationToken);
+
+        // Delete all related daily reports
+        var relatedReports = await dailyReports.GetBySubcontractorCrewAsync(id, cancellationToken);
+        if (relatedReports.Count > 0)
+        {
+            dailyReports.RemoveDailyReports(relatedReports);
+        }
+
         construction.RemoveSubcontractorCrew(crew);
         await construction.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<DeleteCrewImpactResponse> GetDeleteCrewImpactAsync(Guid id, Guid subcontractorId, CancellationToken cancellationToken = default)
+    {
+        var crew = await construction.GetSubcontractorCrewWithDetailsAsync(id, cancellationToken)
+            ?? throw new KeyNotFoundException("Crew was not found.");
+
+        if (crew.SubcontractorId != subcontractorId)
+        {
+            throw new ValidationException("You can only view your own crews.");
+        }
+
+        var reportCount = await dailyReports.CountDailyReportsBySubcontractorCrewAsync(id, cancellationToken);
+        var workOrderCount = await workOrders.CountWorkOrdersBySubcontractorCrewAsync(id, cancellationToken);
+
+        return new DeleteCrewImpactResponse(
+            crew.Id,
+            crew.Name,
+            crew.Workers.Count,
+            reportCount,
+            workOrderCount
+        );
     }
 
     public async Task AssignWorkerToCrewAsync(
@@ -339,6 +373,7 @@ public class SubcontractorCrewService(
                 w.Email,
                 w.DefaultPassword,
                 crew.CurrentForemanId == w.Id,
+                w.InewiEmployeeId,
                 w.CreatedAt)).ToList() ?? [],
             crew.ForemanHistory?.Select(h => new ForemanHistoryResponse(
                 h.Id,

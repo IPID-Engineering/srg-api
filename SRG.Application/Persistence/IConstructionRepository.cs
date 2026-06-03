@@ -38,6 +38,7 @@ public interface IConstructionRepository
     Task<List<SubcontractorWorker>> GetSubcontractorWorkersByCrewAsync(Guid crewId, CancellationToken cancellationToken = default);
     Task AddSubcontractorWorkerAsync(SubcontractorWorker worker, CancellationToken cancellationToken = default);
     void RemoveSubcontractorWorker(SubcontractorWorker worker);
+    Task<int> ClearInewiMappingsForOrphanedWorkersAsync(Guid subcontractorId, CancellationToken cancellationToken = default);
 
     Task<List<SubcontractorCrew>> GetSubcontractorCrewsAsync(Guid subcontractorId, CancellationToken cancellationToken = default);
     Task<List<SubcontractorCrew>> GetAllSubcontractorCrewsAsync(CancellationToken cancellationToken = default);

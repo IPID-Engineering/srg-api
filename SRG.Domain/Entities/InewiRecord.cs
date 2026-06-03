@@ -1,10 +1,14 @@
 namespace SRG.Domain.Entities;
 
+/// <summary>
+/// Rekord godzin pracy z systemu INEWI.
+/// Globalny dla całego podwykonawcy, nie powiązany z konkretną brygadą.
+/// </summary>
 public class InewiRecord
 {
     public Guid Id { get; set; } = Guid.NewGuid();
-    public Guid SubcontractorCrewId { get; set; }
-    public SubcontractorCrew? SubcontractorCrew { get; set; }
+    public Guid SubcontractorId { get; set; }
+    public User? Subcontractor { get; set; }
     public required string WorkerName { get; set; }
     public DateOnly Date { get; set; }
     public decimal Hours { get; set; }

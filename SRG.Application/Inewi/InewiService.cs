@@ -5,26 +5,26 @@ namespace SRG.Application.Inewi;
 
 public interface IInewiService
 {
-    Task<List<InewiRecordResponse>> GetBySubcontractorCrewAsync(Guid subcontractorCrewId, CancellationToken cancellationToken = default);
-    Task<List<InewiRecordResponse>> GetByDateRangeAsync(Guid subcontractorCrewId, DateOnly from, DateOnly to, CancellationToken cancellationToken = default);
-    Task<ImportInewiResult> ImportAsync(Guid subcontractorCrewId, Guid importedById, List<ImportInewiRecord> records, string? sourceFileName, CancellationToken cancellationToken = default);
+    Task<List<InewiRecordResponse>> GetBySubcontractorAsync(Guid subcontractorId, CancellationToken cancellationToken = default);
+    Task<List<InewiRecordResponse>> GetByDateRangeAsync(Guid subcontractorId, DateOnly from, DateOnly to, CancellationToken cancellationToken = default);
+    Task<ImportInewiResult> ImportAsync(Guid subcontractorId, Guid importedById, List<ImportInewiRecord> records, string? sourceFileName, CancellationToken cancellationToken = default);
 }
 
 public class InewiService(IInewiRepository inewiRepository) : IInewiService
 {
-    public async Task<List<InewiRecordResponse>> GetBySubcontractorCrewAsync(Guid subcontractorCrewId, CancellationToken cancellationToken = default)
+    public async Task<List<InewiRecordResponse>> GetBySubcontractorAsync(Guid subcontractorId, CancellationToken cancellationToken = default)
     {
-        var records = await inewiRepository.GetBySubcontractorCrewAsync(subcontractorCrewId, cancellationToken);
+        var records = await inewiRepository.GetBySubcontractorAsync(subcontractorId, cancellationToken);
         return records.Select(ToResponse).ToList();
     }
 
-    public async Task<List<InewiRecordResponse>> GetByDateRangeAsync(Guid subcontractorCrewId, DateOnly from, DateOnly to, CancellationToken cancellationToken = default)
+    public async Task<List<InewiRecordResponse>> GetByDateRangeAsync(Guid subcontractorId, DateOnly from, DateOnly to, CancellationToken cancellationToken = default)
     {
-        var records = await inewiRepository.GetByDateRangeAsync(subcontractorCrewId, from, to, cancellationToken);
+        var records = await inewiRepository.GetByDateRangeAsync(subcontractorId, from, to, cancellationToken);
         return records.Select(ToResponse).ToList();
     }
 
-    public async Task<ImportInewiResult> ImportAsync(Guid subcontractorCrewId, Guid importedById, List<ImportInewiRecord> records, string? sourceFileName, CancellationToken cancellationToken = default)
+    public async Task<ImportInewiResult> ImportAsync(Guid subcontractorId, Guid importedById, List<ImportInewiRecord> records, string? sourceFileName, CancellationToken cancellationToken = default)
     {
         var imported = 0;
         var updated = 0;
@@ -32,7 +32,7 @@ public class InewiService(IInewiRepository inewiRepository) : IInewiService
 
         foreach (var record in records)
         {
-            var existing = await inewiRepository.GetByWorkerAndDateAsync(subcontractorCrewId, record.WorkerName, record.Date, cancellationToken);
+            var existing = await inewiRepository.GetByWorkerAndDateAsync(subcontractorId, record.WorkerName, record.Date, cancellationToken);
 
             if (existing != null)
             {
@@ -49,7 +49,7 @@ public class InewiService(IInewiRepository inewiRepository) : IInewiService
             {
                 var newRecord = new InewiRecord
                 {
-                    SubcontractorCrewId = subcontractorCrewId,
+                    SubcontractorId = subcontractorId,
                     WorkerName = record.WorkerName,
                     Date = record.Date,
                     Hours = record.Hours,
@@ -71,7 +71,7 @@ public class InewiService(IInewiRepository inewiRepository) : IInewiService
     {
         return new InewiRecordResponse(
             record.Id,
-            record.SubcontractorCrewId,
+            record.SubcontractorId,
             record.WorkerName,
             record.Date,
             record.Hours,
@@ -82,7 +82,7 @@ public class InewiService(IInewiRepository inewiRepository) : IInewiService
 
 public record InewiRecordResponse(
     Guid Id,
-    Guid SubcontractorCrewId,
+    Guid SubcontractorId,
     string WorkerName,
     DateOnly Date,
     decimal Hours,
