@@ -374,6 +374,8 @@ public class SubcontractorCrewService(
                 w.DefaultPassword,
                 crew.CurrentForemanId == w.Id,
                 w.InewiEmployeeId,
+                w.RateGroupId,
+                w.RateGroup?.Name,
                 w.CreatedAt)).ToList() ?? [],
             crew.ForemanHistory?.Select(h => new ForemanHistoryResponse(
                 h.Id,

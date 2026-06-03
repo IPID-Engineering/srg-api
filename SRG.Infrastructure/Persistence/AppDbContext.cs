@@ -50,6 +50,7 @@ public class AppDbContext(
     public DbSet<MaterialRequest> MaterialRequests => Set<MaterialRequest>();
     public DbSet<InewiRecord> InewiRecords => Set<InewiRecord>();
     public DbSet<InewiIntegrationSettings> InewiIntegrationSettings => Set<InewiIntegrationSettings>();
+    public DbSet<RateGroup> RateGroups => Set<RateGroup>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

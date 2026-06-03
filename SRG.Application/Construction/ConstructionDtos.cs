@@ -64,6 +64,11 @@ public record SubcontractorWorkerResponse(
     /// ID pracownika w systemie inewi - jeśli przypisany
     /// </summary>
     string? InewiEmployeeId,
+    /// <summary>
+    /// Grupa stawek przypisana do pracownika
+    /// </summary>
+    Guid? RateGroupId,
+    string? RateGroupName,
     DateTime CreatedAt);
 
 public record AssignSubcontractorRequest(Guid SubcontractorId);

@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<IAnalyticsService, AnalyticsService>();
         services.AddScoped<IExportService, ExportService>();
         services.AddScoped<IInewiRepository, InewiRepository>();
+        services.AddScoped<IRateGroupRepository, RateGroupRepository>();
         services.AddHostedService<DailyReportAutoCreationService>();
         
         // Inewi API client

@@ -147,6 +147,7 @@ public class ConstructionRepository(AppDbContext dbContext) : IConstructionRepos
     public Task<List<SubcontractorWorker>> GetSubcontractorWorkersAsync(Guid subcontractorId, CancellationToken cancellationToken = default)
     {
         return dbContext.SubcontractorWorkers
+            .Include(worker => worker.RateGroup)
             .Where(worker => worker.SubcontractorId == subcontractorId && worker.CrewId != null)
             .OrderBy(worker => worker.LastName)
             .ThenBy(worker => worker.FirstName)
@@ -155,7 +156,9 @@ public class ConstructionRepository(AppDbContext dbContext) : IConstructionRepos
 
     public Task<SubcontractorWorker?> GetSubcontractorWorkerByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        return dbContext.SubcontractorWorkers.FirstOrDefaultAsync(worker => worker.Id == id, cancellationToken);
+        return dbContext.SubcontractorWorkers
+            .Include(worker => worker.RateGroup)
+            .FirstOrDefaultAsync(worker => worker.Id == id, cancellationToken);
     }
 
     public Task<SubcontractorWorker?> GetSubcontractorWorkerByEmailAsync(string email, CancellationToken cancellationToken = default)
@@ -210,6 +213,7 @@ public class ConstructionRepository(AppDbContext dbContext) : IConstructionRepos
         return dbContext.SubcontractorCrews
             .Include(crew => crew.CurrentForeman)
             .Include(crew => crew.Workers)
+                .ThenInclude(worker => worker.RateGroup)
             .Where(crew => crew.SubcontractorId == subcontractorId)
             .OrderBy(crew => crew.Name)
             .ToListAsync(cancellationToken);
@@ -235,6 +239,7 @@ public class ConstructionRepository(AppDbContext dbContext) : IConstructionRepos
         return dbContext.SubcontractorCrews
             .Include(crew => crew.CurrentForeman)
             .Include(crew => crew.Workers)
+                .ThenInclude(worker => worker.RateGroup)
             .Include(crew => crew.ForemanHistory)
                 .ThenInclude(history => history.Foreman)
             .FirstOrDefaultAsync(crew => crew.Id == id, cancellationToken);

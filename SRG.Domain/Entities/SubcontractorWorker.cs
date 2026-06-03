@@ -41,6 +41,12 @@ public class SubcontractorWorker
     /// </summary>
     public string? InewiEmployeeId { get; set; }
     
+    /// <summary>
+    /// Grupa stawek przypisana do pracownika.
+    /// </summary>
+    public Guid? RateGroupId { get; set; }
+    public RateGroup? RateGroup { get; set; }
+    
     public ICollection<WorkHour> WorkHours { get; set; } = [];
     public ICollection<SubcontractorForemanHistory> ForemanHistory { get; set; } = [];
 }

@@ -6,6 +6,7 @@ using SRG.Application.DailyReports;
 using SRG.Application.Email;
 using SRG.Application.Inewi;
 using SRG.Application.MaterialRequests;
+using SRG.Application.RateGroups;
 using SRG.Application.Warehouses;
 using SRG.Application.WorkOrders;
 
@@ -45,6 +46,7 @@ public static class DependencyInjection
         services.AddScoped<IMaterialRequestService, MaterialRequestService>();
         services.AddScoped<IInewiService, InewiService>();
         services.AddScoped<IInewiIntegrationService, InewiIntegrationService>();
+        services.AddScoped<IRateGroupService, RateGroupService>();
 
         return services;
     }

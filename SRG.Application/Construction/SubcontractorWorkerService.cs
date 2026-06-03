@@ -131,6 +131,8 @@ public class SubcontractorWorkerService(
             worker.DefaultPassword,
             isForeman,
             worker.InewiEmployeeId,
+            worker.RateGroupId,
+            worker.RateGroup?.Name,
             worker.CreatedAt);
     }
 }
