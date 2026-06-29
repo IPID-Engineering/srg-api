@@ -17,11 +17,16 @@ public interface IInewiIntegrationService
     Task DisableIntegrationAsync(Guid subcontractorId, CancellationToken cancellationToken = default);
     Task<InewiEmployeesListResponse> GetInewiEmployeesAsync(Guid subcontractorId, CancellationToken cancellationToken = default);
     Task MapWorkerToInewiEmployeeAsync(Guid workerId, string? inewiEmployeeId, CancellationToken cancellationToken = default);
+    Task<InewiWorkersSyncResult> SyncWorkersToInewiAsync(Guid subcontractorId, CancellationToken cancellationToken = default);
+    Task<InewiPrintQrResult> PrintQrCodesAsync(Guid subcontractorId, InewiPrintQrRequest request, CancellationToken cancellationToken = default);
+    Task<InewiWorkersDetailedReportResponse> GetDetailedReportAsync(Guid subcontractorId, DateOnly date, CancellationToken cancellationToken = default);
+    Task<InewiSyncDebugResult> DebugSyncAsync(Guid subcontractorId, InewiSyncRequest request, CancellationToken cancellationToken = default);
 }
 
 public class InewiIntegrationService(
     IInewiRepository inewiRepository,
     IConstructionRepository constructionRepository,
+    IJobPositionRepository jobPositionRepository,
     IInewiApiClient inewiApiClient,
     ILogger<InewiIntegrationService> logger) : IInewiIntegrationService
 {
@@ -135,13 +140,62 @@ public class InewiIntegrationService(
             throw new ValidationException("Integracja z inewi jest wyłączona.");
         }
 
-        // Get all workers for this subcontractor with mapped inewi IDs
+        // Check if token is expired and refresh if needed
+        var accessToken = settings.AccessToken;
+        if (string.IsNullOrEmpty(accessToken) || settings.TokenExpiresAt < DateTime.UtcNow.AddMinutes(5))
+        {
+            accessToken = await RefreshTokenAsync(settings, cancellationToken);
+        }
+
+        // Get all workers for this subcontractor
         var workers = await constructionRepository.GetSubcontractorWorkersAsync(subcontractorId, cancellationToken);
         var mappedWorkers = workers.Where(w => !string.IsNullOrEmpty(w.InewiEmployeeId)).ToList();
         
+        // If no workers are mapped, try to auto-map them first
+        if (mappedWorkers.Count == 0 && workers.Count > 0)
+        {
+            logger.LogInformation("No workers mapped to inewi, attempting auto-mapping for subcontractor {SubcontractorId}", subcontractorId);
+            
+            var orgSession = await inewiApiClient.GetOrganizationSessionAsync(accessToken!, cancellationToken);
+            var hasChanges = false;
+            
+            foreach (var worker in workers)
+            {
+                var workerFullName = NormalizeName($"{worker.FirstName} {worker.LastName}");
+                
+                var matchingEmployee = orgSession.Employees.FirstOrDefault(e => 
+                    NormalizeName(e.FullName).Equals(workerFullName, StringComparison.OrdinalIgnoreCase));
+                
+                if (matchingEmployee == null)
+                {
+                    var reversedName = NormalizeName($"{worker.LastName} {worker.FirstName}");
+                    matchingEmployee = orgSession.Employees.FirstOrDefault(e => 
+                        NormalizeName(e.FullName).Equals(reversedName, StringComparison.OrdinalIgnoreCase));
+                }
+                
+                if (matchingEmployee != null)
+                {
+                    var alreadyMapped = workers.Any(w => w.InewiEmployeeId == matchingEmployee.Id && w.Id != worker.Id);
+                    if (!alreadyMapped)
+                    {
+                        worker.InewiEmployeeId = matchingEmployee.Id;
+                        hasChanges = true;
+                        logger.LogInformation("Auto-mapped worker {WorkerName} to inewi employee {InewiName} ({InewiId})", 
+                            $"{worker.FirstName} {worker.LastName}", matchingEmployee.FullName, matchingEmployee.Id);
+                    }
+                }
+            }
+            
+            if (hasChanges)
+            {
+                await constructionRepository.SaveChangesAsync(cancellationToken);
+                mappedWorkers = workers.Where(w => !string.IsNullOrEmpty(w.InewiEmployeeId)).ToList();
+            }
+        }
+        
         if (mappedWorkers.Count == 0)
         {
-            throw new ValidationException("Brak pracowników z przypisanym ID inewi. Przypisz pracowników w ustawieniach integracji.");
+            throw new ValidationException("Brak pracowników z przypisanym ID inewi. Nazwy pracowników w SRG nie pasują do nazw w inewi - przypisz ręcznie w ustawieniach integracji.");
         }
 
         var inewiEmployeeIds = mappedWorkers.Select(w => w.InewiEmployeeId!).ToList();
@@ -154,35 +208,37 @@ public class InewiIntegrationService(
 
         try
         {
-            // Check if token is expired and refresh if needed
-            var accessToken = settings.AccessToken;
-            if (string.IsNullOrEmpty(accessToken) || settings.TokenExpiresAt < DateTime.UtcNow.AddMinutes(5))
-            {
-                accessToken = await RefreshTokenAsync(settings, cancellationToken);
-            }
+            // Use the detailed report API instead of CSV export
+            logger.LogInformation("Calling inewi detailed report for {Count} employees, from {From} to {To}", inewiEmployeeIds.Count, request.From, request.To);
+            var detailedReport = await inewiApiClient.GetDetailedReportAsync(accessToken!, request.From, request.To, cancellationToken);
+            logger.LogInformation("Detailed report received: {EmployeeCount} employees, {DateCount} dates", detailedReport.Employees.Count, detailedReport.Dates.Count);
 
-            // Get organization session to map inewi employee names to IDs
-            var orgSession = await inewiApiClient.GetOrganizationSessionAsync(accessToken!, cancellationToken);
+            // Parse the detailed report and extract hours
+            var records = new List<ParsedInewiRecord>();
             
-            // Build mapping: inewi employee full name (normalized) -> inewi employee ID
-            var inewiNameToId = orgSession.Employees.ToDictionary(
-                e => NormalizeName(e.FullName),
-                e => e.Id,
-                StringComparer.OrdinalIgnoreCase
-            );
-
-            // Get export URL from inewi
-            logger.LogInformation("Calling inewi export for {Count} employees, from {From} to {To}", inewiEmployeeIds.Count, request.From, request.To);
-            var exportResult = await inewiApiClient.ExportDataAsync(accessToken!, inewiEmployeeIds, request.From, request.To, cancellationToken);
-            logger.LogInformation("Export URL received: {Url}", exportResult.Url);
-
-            // Download the ZIP file
-            var zipData = await inewiApiClient.DownloadExportFileAsync(exportResult.Url, cancellationToken);
-            logger.LogInformation("Downloaded ZIP file, size: {Size} bytes", zipData.Length);
-
-            // Parse the ZIP and extract records using both mappings
-            var records = ParseExportZip(zipData, inewiNameToId, inewiIdToWorkerName, logger);
-            logger.LogInformation("Parsed {Count} records from ZIP", records.Count);
+            foreach (var empReport in detailedReport.Employees)
+            {
+                // Find the worker name for this employee ID
+                if (!inewiIdToWorkerName.TryGetValue(empReport.EmployeeId, out var workerName))
+                {
+                    logger.LogWarning("No worker mapping found for inewi employee {EmployeeId}", empReport.EmployeeId);
+                    continue;
+                }
+                
+                foreach (var dayReport in empReport.Days)
+                {
+                    // WorkTimeMinutes contains the total work time for the day
+                    if (dayReport.WorkTimeMinutes.HasValue && dayReport.WorkTimeMinutes.Value > 0)
+                    {
+                        var hours = Math.Round(dayReport.WorkTimeMinutes.Value / 60m, 2);
+                        records.Add(new ParsedInewiRecord(workerName, dayReport.Date, hours));
+                        logger.LogInformation("Parsed record: {WorkerName}, {Date}, {Hours}h (from {Minutes} minutes)", 
+                            workerName, dayReport.Date, hours, dayReport.WorkTimeMinutes.Value);
+                    }
+                }
+            }
+            
+            logger.LogInformation("Parsed {Count} records from detailed report", records.Count);
 
             // Import records
             var imported = 0;
@@ -202,7 +258,7 @@ public class InewiIntegrationService(
                     if (existing.Hours != record.Hours)
                     {
                         existing.Hours = record.Hours;
-                        existing.SourceFileName = "inewi-export";
+                        existing.SourceFileName = "inewi-report";
                         existing.ImportedAt = now;
                         existing.ImportedById = userId;
                         updated++;
@@ -216,7 +272,7 @@ public class InewiIntegrationService(
                         WorkerName = record.WorkerName,
                         Date = record.Date,
                         Hours = record.Hours,
-                        SourceFileName = "inewi-export",
+                        SourceFileName = "inewi-report",
                         ImportedAt = now,
                         ImportedById = userId
                     };
@@ -268,17 +324,25 @@ public class InewiIntegrationService(
         InewiIntegrationSettings settings,
         CancellationToken cancellationToken)
     {
-        // Get organization session to map inewi employee names to IDs
-        var orgSession = await inewiApiClient.GetOrganizationSessionAsync(accessToken, cancellationToken);
-        var inewiNameToId = orgSession.Employees.ToDictionary(
-            e => NormalizeName(e.FullName),
-            e => e.Id,
-            StringComparer.OrdinalIgnoreCase
-        );
-
-        var exportResult = await inewiApiClient.ExportDataAsync(accessToken, inewiEmployeeIds, request.From, request.To, cancellationToken);
-        var zipData = await inewiApiClient.DownloadExportFileAsync(exportResult.Url, cancellationToken);
-        var records = ParseExportZip(zipData, inewiNameToId, inewiIdToWorkerName, logger);
+        // Use the detailed report API
+        var detailedReport = await inewiApiClient.GetDetailedReportAsync(accessToken, request.From, request.To, cancellationToken);
+        
+        var records = new List<ParsedInewiRecord>();
+        
+        foreach (var empReport in detailedReport.Employees)
+        {
+            if (!inewiIdToWorkerName.TryGetValue(empReport.EmployeeId, out var workerName))
+                continue;
+            
+            foreach (var dayReport in empReport.Days)
+            {
+                if (dayReport.WorkTimeMinutes.HasValue && dayReport.WorkTimeMinutes.Value > 0)
+                {
+                    var hours = Math.Round(dayReport.WorkTimeMinutes.Value / 60m, 2);
+                    records.Add(new ParsedInewiRecord(workerName, dayReport.Date, hours));
+                }
+            }
+        }
 
         var imported = 0;
         var updated = 0;
@@ -297,7 +361,7 @@ public class InewiIntegrationService(
                 if (existing.Hours != record.Hours)
                 {
                     existing.Hours = record.Hours;
-                    existing.SourceFileName = "inewi-export";
+                    existing.SourceFileName = "inewi-report";
                     existing.ImportedAt = now;
                     existing.ImportedById = userId;
                     updated++;
@@ -311,7 +375,7 @@ public class InewiIntegrationService(
                     WorkerName = record.WorkerName,
                     Date = record.Date,
                     Hours = record.Hours,
-                    SourceFileName = "inewi-export",
+                    SourceFileName = "inewi-report",
                     ImportedAt = now,
                     ImportedById = userId
                 };
@@ -772,6 +836,361 @@ public class InewiIntegrationService(
         
         return Encoding.UTF8.GetString(plainBytes);
     }
+
+    public async Task<InewiWorkersSyncResult> SyncWorkersToInewiAsync(Guid subcontractorId, CancellationToken cancellationToken = default)
+    {
+        var settings = await inewiRepository.GetIntegrationSettingsAsync(subcontractorId, cancellationToken);
+        if (settings == null || !settings.IsEnabled)
+        {
+            throw new ValidationException("Integracja z inewi nie jest skonfigurowana lub wyłączona.");
+        }
+
+        var accessToken = settings.AccessToken;
+        if (string.IsNullOrEmpty(accessToken) || settings.TokenExpiresAt < DateTime.UtcNow.AddMinutes(5))
+        {
+            throw new ValidationException("Token inewi wygasł - wymagana ponowna konfiguracja integracji.");
+        }
+
+        var errors = new List<string>();
+        var jobPositionsSynced = 0;
+        var workersCreated = 0;
+        var workersMatched = 0;
+
+        var session = await inewiApiClient.GetOrganizationSessionAsync(accessToken, cancellationToken);
+        var inewiPositions = session.WorkPositions.ToDictionary(p => p.Name.Trim().ToLowerInvariant());
+        var inewiEmployeesByCustomId = session.Employees
+            .Where(e => !string.IsNullOrEmpty(e.CustomEmployeeId))
+            .ToDictionary(e => e.CustomEmployeeId!, e => e);
+
+        var jobPositions = await jobPositionRepository.GetAllAsync(cancellationToken);
+        foreach (var position in jobPositions.Where(p => p.IsActive && string.IsNullOrEmpty(p.InewiWorkPositionId)))
+        {
+            var normalizedName = position.Name.Trim().ToLowerInvariant();
+            
+            if (inewiPositions.TryGetValue(normalizedName, out var existingPosition))
+            {
+                position.InewiWorkPositionId = existingPosition.Id;
+                jobPositionsSynced++;
+            }
+            else
+            {
+                try
+                {
+                    var newPosition = await inewiApiClient.CreateWorkPositionAsync(accessToken, position.Name, cancellationToken);
+                    if (newPosition != null)
+                    {
+                        position.InewiWorkPositionId = newPosition.Id;
+                        inewiPositions[normalizedName] = newPosition;
+                    }
+                    else
+                    {
+                        var refreshedSession = await inewiApiClient.GetOrganizationSessionAsync(accessToken, cancellationToken);
+                        var createdPosition = refreshedSession.WorkPositions.FirstOrDefault(p => 
+                            p.Name.Trim().Equals(position.Name.Trim(), StringComparison.OrdinalIgnoreCase));
+                        if (createdPosition != null)
+                        {
+                            position.InewiWorkPositionId = createdPosition.Id;
+                            inewiPositions[normalizedName] = createdPosition;
+                        }
+                    }
+                    jobPositionsSynced++;
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"Błąd stanowiska '{position.Name}': {ex.Message}");
+                }
+            }
+        }
+
+        await jobPositionRepository.SaveChangesAsync(cancellationToken);
+
+        var workers = await constructionRepository.GetSubcontractorWorkersAsync(subcontractorId, cancellationToken);
+        foreach (var worker in workers.Where(w => string.IsNullOrEmpty(w.InewiEmployeeId)))
+        {
+            var workerId = worker.Id.ToString();
+            
+            if (inewiEmployeesByCustomId.TryGetValue(workerId, out var existingEmployee))
+            {
+                worker.InewiEmployeeId = existingEmployee.Id;
+                workersMatched++;
+            }
+            else
+            {
+                try
+                {
+                    var workPositionId = worker.JobPosition?.InewiWorkPositionId;
+                    var newEmployeeId = await inewiApiClient.CreateEmployeeAsync(
+                        accessToken, 
+                        worker.FirstName, 
+                        worker.LastName, 
+                        worker.Email, 
+                        workPositionId,
+                        workerId,
+                        cancellationToken);
+
+                    if (newEmployeeId != null)
+                    {
+                        worker.InewiEmployeeId = newEmployeeId;
+                    }
+                    else
+                    {
+                        var refreshedSession = await inewiApiClient.GetOrganizationSessionAsync(accessToken, cancellationToken);
+                        var createdEmployee = refreshedSession.Employees.FirstOrDefault(e => 
+                            e.CustomEmployeeId == workerId);
+                        if (createdEmployee != null)
+                        {
+                            worker.InewiEmployeeId = createdEmployee.Id;
+                            inewiEmployeesByCustomId[workerId] = createdEmployee;
+                        }
+                    }
+                    workersCreated++;
+                }
+                catch (Exception ex)
+                {
+                    errors.Add($"Błąd pracownika '{worker.FirstName} {worker.LastName}': {ex.Message}");
+                }
+            }
+        }
+
+        await constructionRepository.SaveChangesAsync(cancellationToken);
+
+        return new InewiWorkersSyncResult(jobPositionsSynced, workersCreated, workersMatched, errors);
+    }
+
+    public async Task<InewiPrintQrResult> PrintQrCodesAsync(Guid subcontractorId, InewiPrintQrRequest request, CancellationToken cancellationToken = default)
+    {
+        var settings = await inewiRepository.GetIntegrationSettingsAsync(subcontractorId, cancellationToken);
+        if (settings == null || !settings.IsEnabled || string.IsNullOrEmpty(settings.AccessToken))
+        {
+            throw new ValidationException("Integracja z inewi nie jest skonfigurowana lub wyłączona.");
+        }
+
+        if (request.EmployeeIds == null || request.EmployeeIds.Count == 0)
+        {
+            throw new ValidationException("Nie wybrano pracowników do drukowania kodów QR.");
+        }
+
+        var accessToken = settings.AccessToken;
+        if (string.IsNullOrEmpty(accessToken) || settings.TokenExpiresAt < DateTime.UtcNow.AddMinutes(5))
+        {
+            // Token expired, refresh it
+            var password = DecryptPassword(settings.EncryptedPassword);
+            var tokenResponse = await inewiApiClient.AuthenticateAsync(settings.Email, password, cancellationToken);
+            
+            settings.AccessToken = tokenResponse.AccessToken;
+            settings.TokenExpiresAt = DateTime.UtcNow.AddHours(24);
+            await inewiRepository.SaveChangesAsync(cancellationToken);
+            
+            accessToken = tokenResponse.AccessToken;
+        }
+        
+        var options = request.Options ?? new InewiPrintQrOptions();
+        
+        try
+        {
+            return await inewiApiClient.PrintQrCodesAsync(accessToken, request.EmployeeIds, options, cancellationToken);
+        }
+        catch (InewiTokenExpiredException)
+        {
+            settings.LastError = "Token wygasł - wymagana ponowna konfiguracja";
+            settings.AccessToken = null;
+            settings.TokenExpiresAt = null;
+            await inewiRepository.SaveChangesAsync(cancellationToken);
+            throw new ValidationException("Sesja wygasła. Proszę ponownie skonfigurować integrację.");
+        }
+    }
+
+    public async Task<InewiWorkersDetailedReportResponse> GetDetailedReportAsync(Guid subcontractorId, DateOnly date, CancellationToken cancellationToken = default)
+    {
+        var settings = await inewiRepository.GetIntegrationSettingsAsync(subcontractorId, cancellationToken);
+        if (settings == null || !settings.IsEnabled)
+        {
+            throw new ValidationException("Integracja z inewi nie jest skonfigurowana lub wyłączona.");
+        }
+
+        var accessToken = settings.AccessToken;
+        if (string.IsNullOrEmpty(accessToken) || settings.TokenExpiresAt < DateTime.UtcNow.AddMinutes(5))
+        {
+            accessToken = await RefreshTokenAsync(settings, cancellationToken);
+        }
+
+        // Get workers for this subcontractor with inewi mapping
+        var workers = await constructionRepository.GetSubcontractorWorkersAsync(subcontractorId, cancellationToken);
+        var mappedWorkers = workers.Where(w => !string.IsNullOrEmpty(w.InewiEmployeeId)).ToList();
+
+        if (mappedWorkers.Count == 0)
+        {
+            return new InewiWorkersDetailedReportResponse(date, []);
+        }
+
+        // Build mapping: inewiEmployeeId -> worker
+        var inewiIdToWorker = mappedWorkers.ToDictionary(w => w.InewiEmployeeId!, w => w);
+
+        try
+        {
+            // Get detailed report from inewi (single day)
+            var report = await inewiApiClient.GetDetailedReportAsync(accessToken!, date, date, cancellationToken);
+
+            var workerReports = new List<InewiWorkerDetailedReport>();
+            
+            // Poland timezone for local time conversion
+            var polandTz = TimeZoneInfo.FindSystemTimeZoneById("Europe/Warsaw");
+
+            foreach (var worker in mappedWorkers)
+            {
+                var inewiEmpReport = report.Employees.FirstOrDefault(e => e.EmployeeId == worker.InewiEmployeeId);
+                var dayReport = inewiEmpReport?.Days.FirstOrDefault(d => d.Date == date);
+
+                var events = new List<InewiTimeEvent>();
+                decimal? totalWorkMinutes = null;
+                decimal? totalBreakMinutes = null;
+
+                if (dayReport != null)
+                {
+                    totalWorkMinutes = dayReport.WorkTimeMinutes;
+                    totalBreakMinutes = dayReport.BreakTimeMinutes;
+
+                    foreach (var clockEvent in dayReport.ClockEvents)
+                    {
+                        var localTime = TimeZoneInfo.ConvertTimeFromUtc(clockEvent.TimeUtc, polandTz);
+                        events.Add(new InewiTimeEvent(
+                            clockEvent.TimeUtc,
+                            TimeOnly.FromDateTime(localTime),
+                            clockEvent.EventType == InewiClockEventType.Start ? "start" : "end"
+                        ));
+                    }
+                }
+
+                workerReports.Add(new InewiWorkerDetailedReport(
+                    worker.Id,
+                    $"{worker.FirstName} {worker.LastName}",
+                    worker.InewiEmployeeId,
+                    events,
+                    totalWorkMinutes,
+                    totalBreakMinutes
+                ));
+            }
+
+            return new InewiWorkersDetailedReportResponse(date, workerReports);
+        }
+        catch (InewiTokenExpiredException)
+        {
+            var newToken = await RefreshTokenAsync(settings, cancellationToken);
+            var report = await inewiApiClient.GetDetailedReportAsync(newToken, date, date, cancellationToken);
+            
+            var workerReports = new List<InewiWorkerDetailedReport>();
+            var polandTz = TimeZoneInfo.FindSystemTimeZoneById("Europe/Warsaw");
+
+            foreach (var worker in mappedWorkers)
+            {
+                var inewiEmpReport = report.Employees.FirstOrDefault(e => e.EmployeeId == worker.InewiEmployeeId);
+                var dayReport = inewiEmpReport?.Days.FirstOrDefault(d => d.Date == date);
+
+                var events = new List<InewiTimeEvent>();
+                decimal? totalWorkMinutes = null;
+                decimal? totalBreakMinutes = null;
+
+                if (dayReport != null)
+                {
+                    totalWorkMinutes = dayReport.WorkTimeMinutes;
+                    totalBreakMinutes = dayReport.BreakTimeMinutes;
+
+                    foreach (var clockEvent in dayReport.ClockEvents)
+                    {
+                        var localTime = TimeZoneInfo.ConvertTimeFromUtc(clockEvent.TimeUtc, polandTz);
+                        events.Add(new InewiTimeEvent(
+                            clockEvent.TimeUtc,
+                            TimeOnly.FromDateTime(localTime),
+                            clockEvent.EventType == InewiClockEventType.Start ? "start" : "end"
+                        ));
+                    }
+                }
+
+                workerReports.Add(new InewiWorkerDetailedReport(
+                    worker.Id,
+                    $"{worker.FirstName} {worker.LastName}",
+                    worker.InewiEmployeeId,
+                    events,
+                    totalWorkMinutes,
+                    totalBreakMinutes
+                ));
+            }
+
+            return new InewiWorkersDetailedReportResponse(date, workerReports);
+        }
+    }
+    
+    public async Task<InewiSyncDebugResult> DebugSyncAsync(Guid subcontractorId, InewiSyncRequest request, CancellationToken cancellationToken = default)
+    {
+        var debugInfo = new List<string>();
+        
+        var settings = await inewiRepository.GetIntegrationSettingsAsync(subcontractorId, cancellationToken);
+        if (settings == null)
+        {
+            return new InewiSyncDebugResult(false, "No settings found", debugInfo, null, null, null);
+        }
+        
+        debugInfo.Add($"Settings: IsEnabled={settings.IsEnabled}, HasToken={!string.IsNullOrEmpty(settings.AccessToken)}");
+        
+        var accessToken = settings.AccessToken;
+        if (string.IsNullOrEmpty(accessToken))
+        {
+            return new InewiSyncDebugResult(false, "No access token", debugInfo, null, null, null);
+        }
+        
+        // Get mapped workers
+        var workers = await constructionRepository.GetSubcontractorWorkersAsync(subcontractorId, cancellationToken);
+        var mappedWorkers = workers.Where(w => !string.IsNullOrEmpty(w.InewiEmployeeId)).ToList();
+        
+        debugInfo.Add($"Total workers: {workers.Count}, Mapped: {mappedWorkers.Count}");
+        
+        var inewiEmployeeIds = mappedWorkers.Select(w => w.InewiEmployeeId!).ToList();
+        var inewiIdToWorkerName = mappedWorkers.ToDictionary(
+            w => w.InewiEmployeeId!, 
+            w => $"{w.FirstName} {w.LastName}"
+        );
+        
+        foreach (var mapping in inewiIdToWorkerName)
+        {
+            debugInfo.Add($"Mapping: {mapping.Key} -> {mapping.Value}");
+        }
+        
+        try
+        {
+            // Call detailed report API
+            debugInfo.Add($"Calling report API: from={request.From}, to={request.To}");
+            var detailedReport = await inewiApiClient.GetDetailedReportAsync(accessToken, request.From, request.To, cancellationToken);
+            
+            debugInfo.Add($"Report response: {detailedReport.Employees.Count} employees, {detailedReport.Dates.Count} dates");
+            
+            foreach (var emp in detailedReport.Employees)
+            {
+                var daysWithData = emp.Days.Count(d => d.WorkTimeMinutes.HasValue && d.WorkTimeMinutes.Value > 0);
+                var totalMinutes = emp.Days.Sum(d => d.WorkTimeMinutes ?? 0);
+                var isMapped = inewiIdToWorkerName.ContainsKey(emp.EmployeeId);
+                debugInfo.Add($"Employee {emp.EmployeeId}: {emp.Days.Count} days, {daysWithData} with data, {totalMinutes} total minutes, mapped={isMapped}");
+                
+                foreach (var day in emp.Days.Where(d => d.WorkTimeMinutes.HasValue && d.WorkTimeMinutes.Value > 0))
+                {
+                    debugInfo.Add($"  - {day.Date}: {day.WorkTimeMinutes} minutes, {day.ClockEvents.Count} events");
+                }
+            }
+            
+            return new InewiSyncDebugResult(
+                true, 
+                "Success", 
+                debugInfo, 
+                inewiEmployeeIds, 
+                detailedReport.Employees.Select(e => e.EmployeeId).ToList(),
+                detailedReport.Dates.Select(d => d.ToString()).ToList()
+            );
+        }
+        catch (Exception ex)
+        {
+            debugInfo.Add($"Error: {ex.Message}");
+            return new InewiSyncDebugResult(false, ex.Message, debugInfo, inewiEmployeeIds, null, null);
+        }
+    }
 }
 
 public interface IInewiApiClient
@@ -781,17 +1200,23 @@ public interface IInewiApiClient
     Task<InewiOrganizationSession> GetOrganizationSessionAsync(string accessToken, CancellationToken cancellationToken = default);
     Task<InewiExportResult> ExportDataAsync(string accessToken, List<string> peopleIds, DateOnly from, DateOnly to, CancellationToken cancellationToken = default);
     Task<byte[]> DownloadExportFileAsync(string url, CancellationToken cancellationToken = default);
+    Task<InewiWorkPositionApiRecord?> CreateWorkPositionAsync(string accessToken, string name, CancellationToken cancellationToken = default);
+    Task DeleteWorkPositionsAsync(string accessToken, List<string> ids, CancellationToken cancellationToken = default);
+    Task<string?> CreateEmployeeAsync(string accessToken, string firstName, string surname, string? email, string? workPositionId, string? customEmployeeId, CancellationToken cancellationToken = default);
+    Task<InewiPrintQrResult> PrintQrCodesAsync(string accessToken, List<string> employeeIds, InewiPrintQrOptions options, CancellationToken cancellationToken = default);
+    Task<InewiDetailedReportResult> GetDetailedReportAsync(string accessToken, DateOnly from, DateOnly to, CancellationToken cancellationToken = default);
 }
 
 public record InewiTokenApiResponse(string AccessToken, bool RedirectToAccountType);
 public record InewiWorkerApiRecord(string WorkerId, string WorkerName, string Date, decimal Hours);
-public record InewiOrganizationSession(string OrganizationName, List<InewiEmployeeApiRecord> Employees, List<InewiTagApiRecord> Tags);
+public record InewiOrganizationSession(string OrganizationName, List<InewiEmployeeApiRecord> Employees, List<InewiTagApiRecord> Tags, List<InewiWorkPositionApiRecord> WorkPositions);
 public record InewiExportResult(string Url);
-public record InewiEmployeeApiRecord(string Id, string FirstName, string LastName, string? Email, bool IsActive, List<string> TagIds)
+public record InewiEmployeeApiRecord(string Id, string FirstName, string LastName, string? Email, bool IsActive, List<string> TagIds, string? CustomEmployeeId)
 {
     public string FullName => $"{FirstName} {LastName}";
 }
 public record InewiTagApiRecord(string Id, string Name);
+public record InewiWorkPositionApiRecord(string Id, string Name);
 
 public record InewiIntegrationStatusResponse(
     bool IsConfigured,
@@ -805,6 +1230,7 @@ public record InewiIntegrationStatusResponse(
 public record ConfigureInewiIntegrationRequest(string Email, string Password);
 public record InewiSyncRequest(DateOnly From, DateOnly To);
 public record InewiSyncResult(int Imported, int Updated, int Total, string? Error);
+public record InewiWorkersSyncResult(int JobPositionsSynced, int WorkersCreated, int WorkersMatched, List<string> Errors);
 
 public record InewiEmployeesListResponse(
     string OrganizationName,
@@ -818,7 +1244,52 @@ public record InewiWorkerMapping(Guid WorkerId, string WorkerName, string? Inewi
 public record InewiTagInfo(string Id, string Name);
 public record MapWorkerToInewiRequest(string? InewiEmployeeId);
 
+public record InewiPrintQrOptions(
+    bool ShowFirstName = true,
+    bool ShowLastName = true,
+    bool ShowTags = true,
+    bool ShowPhoto = true
+);
+public record InewiPrintQrResult(string Url);
+public record InewiPrintQrRequest(List<string> EmployeeIds, InewiPrintQrOptions? Options);
+
+// Detailed report DTOs
+public record InewiWorkersDetailedReportResponse(
+    DateOnly Date,
+    List<InewiWorkerDetailedReport> Workers
+);
+
+public record InewiWorkerDetailedReport(
+    Guid WorkerId,
+    string WorkerName,
+    string? InewiEmployeeId,
+    List<InewiTimeEvent> Events,
+    decimal? TotalWorkMinutes,
+    decimal? TotalBreakMinutes
+);
+
+public record InewiTimeEvent(
+    DateTime TimeUtc,
+    TimeOnly TimeLocal,
+    string EventType // "start" or "end"
+);
+
+public record InewiDetailedReportResult(List<InewiEmployeeDetailedReport> Employees, List<DateOnly> Dates);
+public record InewiEmployeeDetailedReport(string EmployeeId, List<InewiDailyDetailedReport> Days);
+public record InewiDailyDetailedReport(DateOnly Date, List<InewiClockEvent> ClockEvents, decimal? WorkTimeMinutes, decimal? BreakTimeMinutes);
+public record InewiClockEvent(DateTime TimeUtc, InewiClockEventType EventType);
+public enum InewiClockEventType { Start, End }
+
 public class InewiTokenExpiredException : Exception
 {
     public InewiTokenExpiredException(string message) : base(message) { }
 }
+
+public record InewiSyncDebugResult(
+    bool Success,
+    string Message,
+    List<string> DebugInfo,
+    List<string>? OurEmployeeIds,
+    List<string>? InewiEmployeeIds,
+    List<string>? Dates
+);
